@@ -52,7 +52,7 @@ body { font-family: 'Inter', sans-serif; background: var(--dark); color: var(--w
 .mobile-menu a:hover { background: var(--rose); color: var(--dark); border-color: var(--rose); }
 .mobile-menu.open { display: flex; }
 @media(max-width:768px) { 
-  .nav-links, .nav-right, .admin-fixed-btn { display: none; } 
+  .nav-links, .nav-right { display: none; } 
   .burger { display: none !important; } 
   #navbar, #navbar.scrolled { padding: 24px 20px 0 20px; position: relative; background: var(--dark); border-bottom: none; }
   .nav-inner { justify-content: center; position: relative; width: 100%; }
