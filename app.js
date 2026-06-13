@@ -438,14 +438,14 @@ async function renderDynamicCatalog() {
     return renderDynamicCatalogLocal();
   }
 // Rest of render logic using the fetched variables
-  // Helper para manejar image vs image_url
+  // Helper para manejar image vs image
   
   // Render Services
   const sContainer = document.getElementById('servicesGridContainer');
   if (sContainer) {
     sContainer.innerHTML = '';
     services.forEach(item => {
-      const imgPath = item.image_url || item.image;
+      const imgPath = item.image || item.image;
       const imgHtml = imgPath ? `<img src="${imgPath}" class="service-image" alt="${item.title}">` : `<div class="service-icon"><i class="fas ${item.icon}"></i></div>`;
       const badgeHtml = item.badge ? `<div class="badge">${item.badge}</div>` : '';
       const editBtn = isEditMode ? `<button class="edit-overlay-btn" onclick="openEditModal('service', '${item.id}')"><i class="fas fa-pencil-alt"></i> EDITAR</button>` : '';
@@ -481,7 +481,7 @@ async function renderDynamicCatalog() {
   if (pContainer) {
     pContainer.innerHTML = '';
     promos.forEach(item => {
-      const imgPath = item.image_url || item.image;
+      const imgPath = item.image || item.image;
       const imgHtml = imgPath ? `<img src="${imgPath}" class="promo-image" alt="${item.title}">` : `<div class="promo-icon"><i class="fas ${item.icon}"></i></div>`;
       const badgeClass = item.isHot ? 'promo-badge hot' : 'promo-badge';
       const badgeHtml = item.badge ? `<div class="${badgeClass}">${item.badge}</div>` : '';
@@ -576,7 +576,7 @@ function openEditModal(type, id) {
       document.getElementById('editBadge').value = item.badge || '';
       document.getElementById('editIcon').value = item.icon || 'fa-star';
       
-      const imgPath = item.image_url || item.image;
+      const imgPath = item.image || item.image;
       if (imgPath) {
         document.getElementById('imagePreviewImg').src = imgPath;
         document.getElementById('imagePreviewImg').style.display = 'block';
@@ -674,8 +674,8 @@ async function saveEdit() {
       if (id !== 'new') {
         const list = JSON.parse(localStorage.getItem(`nails_${type}s_data`) || '[]');
         const oldItem = list.find(x => x.id === id);
-        if (oldItem && (oldItem.image_url || oldItem.image)) {
-           const oldUrl = oldItem.image_url || oldItem.image;
+        if (oldItem && (oldItem.image || oldItem.image)) {
+           const oldUrl = oldItem.image || oldItem.image;
            if (oldUrl.includes('supabase')) {
               const oldFileName = oldUrl.split('/').pop();
               await supabaseClient.storage.from('rosegold_images').remove([oldFileName]);
@@ -686,8 +686,8 @@ async function saveEdit() {
        // Si quitaron la imagen, borrar la vieja
        const list = JSON.parse(localStorage.getItem(`nails_${type}s_data`) || '[]');
        const oldItem = list.find(x => x.id === id);
-       if (oldItem && (oldItem.image_url || oldItem.image)) {
-          const oldUrl = oldItem.image_url || oldItem.image;
+       if (oldItem && (oldItem.image || oldItem.image)) {
+          const oldUrl = oldItem.image || oldItem.image;
           if (oldUrl.includes('supabase')) {
              const oldFileName = oldUrl.split('/').pop();
              await supabaseClient.storage.from('rosegold_images').remove([oldFileName]);
@@ -701,7 +701,7 @@ async function saveEdit() {
       price: document.getElementById('editPrice').value || '',
       badge: document.getElementById('editBadge').value || '',
       icon: document.getElementById('editIcon').value || 'fa-star',
-      image_url: finalImageUrl
+      image: finalImageUrl
     };
     
     if (type === 'service') {
