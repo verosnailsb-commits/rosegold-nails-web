@@ -468,6 +468,18 @@ async function renderDynamicCatalog() {
       applyGlobalSettings(window.globalSettings);
     }
     
+    // Extract hero settings
+    const heroSettingsObj = services.find(s => s.id === 'settings_hero');
+    if (heroSettingsObj) {
+      services = services.filter(s => s.id !== 'settings_hero');
+      try {
+        window.heroSettings = JSON.parse(heroSettingsObj.title);
+        applyHeroSettings(window.heroSettings);
+      } catch(e) {}
+    } else {
+      window.heroSettings = getDefaultHeroSettings();
+    }
+    
     // Guardar copia local por si acaso para el admin
     localStorage.setItem('nails_services_data', JSON.stringify(services));
     localStorage.setItem('nails_promos_data', JSON.stringify(promos));
@@ -477,6 +489,9 @@ async function renderDynamicCatalog() {
   
   const editSettingsBtn = document.getElementById('editSettingsBtn');
   if (editSettingsBtn) editSettingsBtn.style.display = isEditMode ? 'inline-block' : 'none';
+  
+  const editHeroBtn = document.getElementById('editHeroBtn');
+  if (editHeroBtn) editHeroBtn.style.display = isEditMode ? 'inline-block' : 'none';
   
   // Helper para manejar image vs image
   // Render Services
@@ -953,3 +968,96 @@ window.openSettingsModal = openSettingsModal;
 window.closeSettingsModal = closeSettingsModal;
 window.saveSettings = saveSettings;
 window.deleteItemDirectly = deleteItemDirectly;
+
+// ---- Lógica de Edición del Banner (Hero) ----
+function getDefaultHeroSettings() {
+  return [
+    { sub: 'Experiencia Spa · Uñas Impecables', titleWhite: 'El Detalle que', titleRose: 'Te Hace Brillar', desc: 'Salón de uñas premium con las últimas tendencias.<br>Estilo, cuidado y sofisticación en tus manos.' },
+    { sub: 'Nueva Colección', titleWhite: 'Manos que', titleRose: 'Impactan', desc: 'Descubre nuestras promociones exclusivas en esculpidas y diseños artísticos.' },
+    { sub: 'Relajación Total', titleWhite: 'Pedicura', titleRose: 'Spa VIP', desc: 'Sumerge tus pies en un mundo de relajación profunda con nuestra promo especial.' },
+    { sub: 'Estilismo y Belleza Capilar', titleWhite: 'Renová tu', titleRose: 'Cabello', desc: 'Peluquería de primer nivel. Tratamientos, color, alisados y cortes con profesionales expertos para resaltar tu belleza.' }
+  ];
+}
+
+function applyHeroSettings(settings) {
+  const slides = document.querySelectorAll('.slider-container .slide');
+  if (slides.length !== 4) return; // Fallback
+  
+  settings.forEach((set, index) => {
+    const slide = slides[index];
+    const subEl = slide.querySelector('.hero-sub') || slide.querySelector('.hero-tag');
+    const titleEl = slide.querySelector('h1');
+    const descEl = slide.querySelector('.hero-desc');
+    
+    if (subEl) subEl.textContent = set.sub;
+    if (titleEl) titleEl.innerHTML = `${set.titleWhite}<br><span class="rose">${set.titleRose}</span>`;
+    if (descEl) descEl.innerHTML = set.desc;
+  });
+}
+
+function openHeroModal() {
+  const set = window.heroSettings || getDefaultHeroSettings();
+  document.getElementById('heroSlideSelect').value = '0';
+  document.getElementById('editHeroModal').style.display = 'flex';
+  loadHeroForm();
+}
+
+function loadHeroForm() {
+  const idx = parseInt(document.getElementById('heroSlideSelect').value);
+  const set = window.heroSettings || getDefaultHeroSettings();
+  const current = set[idx];
+  
+  document.getElementById('heroSub').value = current.sub;
+  document.getElementById('heroTitleWhite').value = current.titleWhite;
+  document.getElementById('heroTitleRose').value = current.titleRose;
+  document.getElementById('heroDesc').value = current.desc.replace(/<br>/g, '\n');
+}
+
+function closeHeroModal() {
+  document.getElementById('editHeroModal').style.display = 'none';
+}
+
+async function saveHeroSettings() {
+  const setBtn = document.getElementById('saveHeroBtn');
+  setBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
+  setBtn.disabled = true;
+  
+  try {
+    const set = window.heroSettings || getDefaultHeroSettings();
+    const idx = parseInt(document.getElementById('heroSlideSelect').value);
+    
+    set[idx].sub = document.getElementById('heroSub').value;
+    set[idx].titleWhite = document.getElementById('heroTitleWhite').value;
+    set[idx].titleRose = document.getElementById('heroTitleRose').value;
+    set[idx].desc = document.getElementById('heroDesc').value.replace(/\n/g, '<br>');
+    
+    // Check if it exists
+    const { data } = await supabaseClient.from('rosegold_services').select('id').eq('id', 'settings_hero').limit(1);
+    
+    if (data && data.length > 0) {
+      await supabaseClient.from('rosegold_services').update({ title: JSON.stringify(set) }).eq('id', 'settings_hero');
+    } else {
+      await supabaseClient.from('rosegold_services').insert([{
+        id: 'settings_hero',
+        title: JSON.stringify(set),
+        desc: 'Configuraciones de banners',
+        price: '', time: '', badge: '', icon: ''
+      }]);
+    }
+    
+    window.heroSettings = set;
+    applyHeroSettings(set);
+    closeHeroModal();
+  } catch (err) {
+    console.error(err);
+    alert("Error al guardar banners: " + err.message);
+  } finally {
+    setBtn.innerHTML = 'Guardar Cambios';
+    setBtn.disabled = false;
+  }
+}
+
+window.openHeroModal = openHeroModal;
+window.closeHeroModal = closeHeroModal;
+window.saveHeroSettings = saveHeroSettings;
+window.loadHeroForm = loadHeroForm;
