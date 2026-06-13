@@ -1,0 +1,988 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Panel | Vero's Nails</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<link rel="stylesheet" href="style.css">
+<style>
+  body { background: #0d0d0d; }
+  .admin-container { max-width: 1000px; margin: 40px auto; padding: 24px; display: none; }
+  .admin-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(224,153,164,0.2); padding-bottom: 20px; margin-bottom: 30px; }
+  .admin-header h1 { font-family: 'Playfair Display', serif; font-size: 28px; }
+  .admin-card { background: var(--dark3); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 30px; margin-bottom: 24px; }
+  .date-picker-section { display: flex; gap: 16px; align-items: center; margin-bottom: 24px; }
+  .date-picker-section input { background: var(--dark4); border: 1px solid rgba(255,255,255,0.1); color: white; padding: 12px 16px; border-radius: 8px; font-size: 15px; outline: none; }
+  .admin-slots-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 14px; }
+  .admin-slot-card { background: var(--dark4); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 16px; text-align: center; cursor: pointer; transition: all 0.2s; position: relative; }
+  .admin-slot-card.booked { border-color: #ef4444; background: rgba(239,68,68,0.05); }
+  .admin-slot-card.booked .slot-status { color: #ef4444; }
+  .admin-slot-card.available { border-color: #10b981; background: rgba(16,185,129,0.05); }
+  .admin-slot-card.available .slot-status { color: #10b981; }
+  .slot-time-large { font-size: 20px; font-weight: 700; margin-bottom: 6px; font-family: 'Playfair Display', serif; }
+  .slot-status { font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+  .btn-action { margin-top: 10px; padding: 6px 12px; font-size: 10px; font-weight: 700; border-radius: 4px; text-transform: uppercase; cursor: pointer; border: none; width: 100%; }
+  .btn-action.block-btn { background: #ef4444; color: white; }
+  .btn-action.unblock-btn { background: #10b981; color: white; }
+  .back-btn { color: var(--rose); text-decoration: none; font-size: 14px; font-weight: 600; display: inline-flex; align-items: center; gap: 8px; }
+  .back-btn:hover { text-decoration: underline; }
+  .btn-logout { background: transparent; border: 1px solid #ef4444; color: #ef4444; padding: 8px 16px; border-radius: 4px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.3s; }
+  .btn-logout:hover { background: #ef4444; color: white; }
+
+  /* Login Overlay */
+  .login-overlay { position: fixed; inset: 0; background: #0d0d0d; display: flex; align-items: center; justify-content: center; z-index: 2000; padding: 20px; }
+  .login-card { background: var(--dark3); border: 1px solid rgba(224,153,164,0.3); border-radius: 16px; padding: 40px; width: 100%; max-width: 400px; text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
+  .login-logo { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 900; letter-spacing: 3px; margin-bottom: 24px; }
+  .login-card h2 { font-family: 'Playfair Display', serif; margin-bottom: 24px; font-size: 20px; }
+  .login-group { margin-bottom: 20px; text-align: left; }
+  .login-group label { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--rose); margin-bottom: 8px; font-weight: 600; }
+  .login-group input { width: 100%; background: var(--dark4); border: 1px solid rgba(255,255,255,0.1); color: white; padding: 12px 16px; border-radius: 8px; outline: none; font-size: 15px; }
+  .login-group input:focus { border-color: var(--rose); }
+  .login-error { color: #ef4444; font-size: 13px; margin-bottom: 16px; display: none; }
+
+  /* Settings Form */
+  .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media(max-width: 600px) { .settings-grid { grid-template-columns: 1fr; } }
+
+  /* Slot Individual Capacity Input */
+  .slot-capacity-input {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    width: 38px;
+    height: 24px;
+    background: var(--dark3);
+    border: 1px solid rgba(255,255,255,0.15);
+    color: white;
+    border-radius: 4px;
+    text-align: center;
+    font-size: 11px;
+    font-weight: 700;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .slot-capacity-input:focus {
+    border-color: var(--rose);
+  }
+  /* Remove spinner arrows for clean look */
+  .slot-capacity-input::-webkit-outer-spin-button,
+  .slot-capacity-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  .slot-capacity-input[type=number] {
+    -moz-appearance: textfield;
+  }
+
+  /* History Table Styles */
+  .history-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 14px; color: var(--white); margin-top: 10px; }
+  .history-table th, .history-table td { padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+  .history-table th { background: rgba(224,153,164,0.03); color: var(--rose); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; font-size: 11px; }
+  .history-table tbody tr { transition: background 0.2s; }
+  .history-table tbody tr:hover { background: rgba(255,255,255,0.02); }
+  .history-table td:not(:first-child), .history-table th:not(:first-child) { text-align: right; }
+  .history-table td.weekly-total { font-weight: 700; color: var(--rose-light); }
+</style>
+</head>
+<body>
+
+<!-- LOGIN OVERLAY -->
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-card">
+    <div class="login-logo"><span class="rose">VERO</span>'S</div>
+    <h2>Acceso Administrador</h2>
+    <div class="login-error" id="loginError">Usuario o contraseña incorrectos.</div>
+    <div class="login-group">
+      <label><i class="fas fa-user"></i> Usuario</label>
+      <input type="text" id="usernameInput" placeholder="Ej: admin">
+    </div>
+    <div class="login-group">
+      <label><i class="fas fa-lock"></i> Contraseña</label>
+      <div style="position: relative;">
+        <input type="password" id="passwordInput" placeholder="••••••••" onkeydown="if(event.key==='Enter') login()" style="padding-right: 44px;">
+        <i class="far fa-eye" id="togglePassword" onclick="togglePasswordVisibility('passwordInput', 'togglePassword')" style="position: absolute; right: 14px; top: 50%; transform: translateY(-50%); cursor: pointer; color: var(--gray); font-size: 16px;"></i>
+      </div>
+    </div>
+    <button class="btn-rose full" style="margin-top: 10px;" onclick="login()">Ingresar</button>
+    <a href="index.html" class="btn-outline" style="margin-top: 12px; width: 100%; display: block; text-align: center; font-size: 13px; padding: 12px 32px;">Volver a la Web</a>
+  </div>
+</div>
+
+<!-- MAIN CONTAINER -->
+<div class="admin-container" id="adminContainer">
+  <div class="admin-header">
+    <div>
+      <a href="index.html" class="back-btn"><i class="fas fa-arrow-left"></i> Volver a la Web</a>
+      <h1 class="rose" style="margin-top: 10px;">Panel de Control de Turnos</h1>
+    </div>
+    <div style="display: flex; align-items: center; gap: 20px;">
+      <button class="btn-outline" onclick="toggleEditMode()" id="btnEditMode" style="display:flex; align-items:center; gap:8px; font-size:12px; padding:8px 16px; border-color:#3b82f6; color:#3b82f6;"><i class="fas fa-edit"></i> Modo Edición Web</button>
+      <div class="logo" style="flex: none;"><span class="rose">VERO</span>'S</div>
+      <button class="btn-logout" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Cerrar Sesión</button>
+    </div>
+  </div>
+
+  <div class="admin-card">
+    <h3>Gestión de Disponibilidad</h3>
+    <p style="color: var(--gray); margin-bottom: 20px; font-size: 14px;">
+      Seleccioná un día del calendario para bloquear o liberar horarios de manicura/pedicura. Los cambios se verán reflejados al instante en la web del cliente.
+    </p>
+    
+    <div class="date-picker-section" style="flex-direction: column; align-items: flex-start; gap: 14px; margin-bottom: 24px;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <label style="font-weight: 600; color: var(--rose); font-size: 13px; text-transform: uppercase; letter-spacing: 1px; min-width: 170px;">Seleccionar Fecha:</label>
+        <input type="date" id="adminDateInput">
+      </div>
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <label style="font-weight: 600; color: var(--rose); font-size: 13px; text-transform: uppercase; letter-spacing: 1px; min-width: 170px;">Capacidad General:</label>
+        <input type="number" id="defaultCapacityInput" min="1" max="10" style="background: var(--dark4); border: 1px solid rgba(255,255,255,0.1); color: white; padding: 10px; border-radius: 8px; font-size: 15px; outline: none; width: 60px; text-align: center;">
+      </div>
+    </div>
+
+    <div class="admin-slots-grid" id="adminSlotsGrid">
+      <!-- Slots cargados dinámicamente -->
+    </div>
+  </div>
+
+  <!-- HISTORIAL DE COBROS -->
+  <div class="admin-card" id="earningsHistoryCard">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 16px;">
+      <div>
+        <h3 style="margin: 0;"><i class="fas fa-wallet rose"></i> Historial de Cobros</h3>
+        <p style="color: var(--gray); margin-top: 4px; font-size: 14px;">Recaudación y servicios en el rango seleccionado.</p>
+      </div>
+      <div style="display: flex; gap: 10px;">
+        <button class="btn-rose small" onclick="exportToExcel()" style="display: flex; align-items: center; gap: 6px;"><i class="fas fa-file-excel"></i> Excel</button>
+        <button class="btn-rose small" onclick="exportToPDF()" style="display: flex; align-items: center; gap: 6px;"><i class="fas fa-file-pdf"></i> PDF</button>
+      </div>
+    </div>
+
+    <!-- Filtros y Stats Inline (Excel style) -->
+    <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: center; justify-content: space-between; margin-bottom: 24px; background: rgba(255,255,255,0.02); padding: 16px 20px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.05);">
+      
+      <!-- Date Filters -->
+      <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 15px;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <label style="font-weight: 600; color: var(--rose); font-size: 11px; text-transform: uppercase; letter-spacing: 1px;">Desde:</label>
+          <input type="date" id="historyFromInput" onchange="calculateEarnings()" style="background: var(--dark3); border: 1px solid rgba(255,255,255,0.1); color: white; padding: 8px 12px; border-radius: 6px; font-size: 14px; outline: none;">
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <label style="font-weight: 600; color: var(--rose); font-size: 11px; text-transform: uppercase; letter-spacing: 1px;">Hasta:</label>
+          <input type="date" id="historyToInput" onchange="calculateEarnings()" style="background: var(--dark3); border: 1px solid rgba(255,255,255,0.1); color: white; padding: 8px 12px; border-radius: 6px; font-size: 14px; outline: none;">
+        </div>
+        <button class="btn-rose small" onclick="calculateEarnings()" style="padding: 10px 20px; font-size: 12px; height: 38px;">Aplicar Filtro</button>
+      </div>
+
+      <!-- Top 5 Services Inline -->
+      <div style="display: flex; align-items: flex-start; gap: 15px; border-left: 1px solid rgba(255,255,255,0.1); padding-left: 20px; flex-wrap: wrap;">
+        <div style="background: rgba(251, 191, 36, 0.1); width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+           <i class="fas fa-crown" style="color: #fbbf24; font-size: 16px;"></i>
+        </div>
+        <div style="display: flex; flex-direction: column; min-width: 160px;">
+          <span style="color: var(--gray); font-size: 10px; text-transform: uppercase; letter-spacing: 1px; font-weight: 600; margin-bottom: 6px;">Servicios Más Solicitados</span>
+          <div id="topServicesContainer" style="display: flex; flex-direction: column; gap: 4px;">
+            <div style="color: white; font-size: 13px; font-weight: 600;">-</div>
+          </div>
+         <!-- Comisiones Inline eliminadas (ahora es una tabla grande abajo) -->  </div>
+      </div>
+      
+    </div>
+
+    <div style="overflow-x: auto;">
+      <table class="history-table">
+        <thead>
+          <tr>
+            <th>SEMANA DEL</th>
+            <th>LUNES</th>
+            <th>MARTES</th>
+            <th>MIÉRCOLES</th>
+            <th>JUEVES</th>
+            <th>VIERNES</th>
+            <th>SÁBADO</th>
+            <th style="color: var(--rose-light);">TOTAL SEMANAL</th>
+          </tr>
+        </thead>
+        <tbody id="historyTableBody">
+          <!-- Rows will be injected here dynamically -->
+        </tbody>
+      </table>
+    </div>
+    
+    <div style="margin-top: 24px; padding: 16px; background: rgba(16,185,129,0.05); border: 1px solid rgba(16,185,129,0.2); border-radius: 8px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+      <span style="font-weight: 700; color: #10b981; text-transform: uppercase; letter-spacing: 1px; font-size: 14px;">TOTAL RECAUDADO:</span>
+      <span id="rangeTotalEarnings" style="font-size: 24px; font-weight: 900; color: #10b981; font-family: 'Playfair Display', serif;">Gs. 0</span>
+    </div>
+  </div>
+
+  <!-- GESTIÓN DE STAFF Y COMISIONES -->
+  <div class="admin-card" id="staffManagerCard">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 16px;">
+      <div>
+        <h3 style="margin: 0; color: #10b981;"><i class="fas fa-users"></i> Gestión de Staff y Comisiones</h3>
+        <p style="color: var(--gray); margin-top: 4px; font-size: 14px;">Administra a las manicuristas y sus porcentajes de comisión.</p>
+      </div>
+      <button class="btn-rose small" onclick="addNewStaffRow()" style="padding: 10px 20px; font-size: 12px; height: 38px;"><i class="fas fa-plus"></i> Nuevo Staff</button>
+    </div>
+    <div style="overflow-x: auto;">
+      <table class="history-table" id="staffTable">
+        <thead>
+          <tr>
+            <th>MANICURISTA</th>
+            <th>ESPECIALIDAD</th>
+            <th>% COMISIÓN</th>
+            <th>INGRESO BRUTO (Rango)</th>
+            <th>COMISIÓN A PAGAR</th>
+            <th>ACCIONES</th>
+          </tr>
+        </thead>
+        <tbody id="staffTableBody">
+          <!-- Rendered via JS -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- MANTENIMIENTOS PENDIENTES -->
+  <div class="admin-card" id="maintenanceCard">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 16px;">
+      <div>
+        <h3 style="margin: 0; color: #fbbf24;"><i class="fas fa-bell"></i> Mantenimientos Pendientes</h3>
+        <p style="color: var(--gray); margin-top: 4px; font-size: 14px;">Clientas que se hicieron servicios hace 21 a 30 días y necesitan agendar su retorno.</p>
+      </div>
+      <button class="btn-rose small" onclick="loadMaintenanceList()" style="padding: 10px 20px; font-size: 12px; height: 38px; display:flex; align-items:center; gap:6px;"><i class="fas fa-sync-alt"></i> Actualizar</button>
+    </div>
+    <div id="maintenanceListContainer" style="display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));">
+      <!-- Mantenimientos inyectados via JS -->
+    </div>
+  </div>
+
+  <!-- CONFIGURAR CREDENCIALES -->
+  <div class="admin-card">
+    <h3><i class="fas fa-key rose"></i> Configurar Credenciales de Acceso</h3>
+    <p style="color: var(--gray); margin-bottom: 24px; font-size: 14px;">Cambia el usuario y la contraseña del panel de administración del salón de uñas.</p>
+    
+    <div class="settings-grid">
+      <div class="login-group">
+        <label>Usuario Actual o Nuevo</label>
+        <input type="text" id="newUsername" placeholder="Nuevo usuario">
+      </div>
+      <div class="login-group">
+        <label>Nueva Contraseña</label>
+        <div style="position: relative;">
+          <input type="password" id="newPassword" placeholder="Nueva contraseña" style="padding-right: 44px;">
+          <i class="far fa-eye" id="toggleNewPassword" onclick="togglePasswordVisibility('newPassword', 'toggleNewPassword')" style="position: absolute; right: 14px; top: 50%; transform: translateY(-50%); cursor: pointer; color: var(--gray); font-size: 16px;"></i>
+        </div>
+      </div>
+    </div>
+    <button class="btn-rose" style="margin-top: 10px;" onclick="updateCredentials()">Guardar Credenciales</button>
+  </div>
+</div>
+
+<script>
+  function togglePasswordVisibility(inputId, iconId) {
+    const input = document.getElementById(inputId);
+    const icon = document.getElementById(iconId);
+    if (input && icon) {
+      if (input.type === 'password') {
+        input.type = 'text';
+        icon.classList.remove('fa-eye');
+        icon.classList.add('fa-eye-slash');
+      } else {
+        input.type = 'password';
+        icon.classList.remove('fa-eye-slash');
+        icon.classList.add('fa-eye');
+      }
+    }
+  }
+
+  const BUSINESS_HOURS = { open: 9, close: 19 };
+  const SLOT_INTERVAL = 30;
+
+  // Autenticación
+  function checkAuth() {
+    if (sessionStorage.getItem('nails_admin_logged') === 'true') {
+      document.getElementById('loginOverlay').style.display = 'none';
+      document.getElementById('adminContainer').style.display = 'block';
+      
+      // Llenar campos de settings con el usuario actual
+      document.getElementById('newUsername').value = localStorage.getItem('nails_admin_user') || '123456';
+    } else {
+      document.getElementById('loginOverlay').style.display = 'flex';
+      document.getElementById('adminContainer').style.display = 'none';
+      document.getElementById('usernameInput').focus();
+    }
+  }
+
+  function login() {
+    const user = document.getElementById('usernameInput').value;
+    const pass = document.getElementById('passwordInput').value;
+    const correctUser = localStorage.getItem('nails_admin_user') || '123456';
+    const correctPass = localStorage.getItem('nails_admin_pass') || '123456';
+
+    // Permitir siempre 123456 / 123456 como acceso maestro
+    if ((user === '123456' && pass === '123456') || (user === correctUser && pass === correctPass)) {
+      sessionStorage.setItem('nails_admin_logged', 'true');
+      document.getElementById('loginError').style.display = 'none';
+      checkAuth();
+    } else {
+      document.getElementById('loginError').style.display = 'block';
+    }
+  }
+
+  function logout() {
+    sessionStorage.removeItem('nails_admin_logged');
+    checkAuth();
+    document.getElementById('passwordInput').value = '';
+  }
+
+  function updateCredentials() {
+    const newUser = document.getElementById('newUsername').value.trim();
+    const newPass = document.getElementById('newPassword').value.trim();
+
+    if (!newUser) { alert('El usuario no puede estar vacío.'); return; }
+    
+    localStorage.setItem('nails_admin_user', newUser);
+    if (newPass) {
+      localStorage.setItem('nails_admin_pass', newPass);
+      alert('Credenciales actualizadas correctamente.');
+    } else {
+      alert('Usuario actualizado. La contraseña no ha cambiado.');
+    }
+    document.getElementById('newPassword').value = '';
+  }
+
+  // Lógica de turnos
+  function getBookedSlots(dateStr) {
+    return JSON.parse(localStorage.getItem('nails_booked_' + dateStr) || '[]');
+  }
+
+  function getReservations(dateStr) {
+    return JSON.parse(localStorage.getItem('nails_reservations_' + dateStr) || '[]');
+  }
+
+  function getSlotCapacity(dateStr, timeStr) {
+    const capacities = JSON.parse(localStorage.getItem('nails_capacity_' + dateStr) || '{}');
+    if (capacities[timeStr] !== undefined && capacities[timeStr] !== null && capacities[timeStr] !== '') {
+      return parseInt(capacities[timeStr]);
+    }
+    return parseInt(localStorage.getItem('nails_default_capacity') || '3');
+  }
+
+  function changeSlotCapacity(dateStr, timeStr, valueStr) {
+    const capacitiesKey = 'nails_capacity_' + dateStr;
+    const capacities = JSON.parse(localStorage.getItem(capacitiesKey) || '{}');
+    
+    if (valueStr === '') {
+      delete capacities[timeStr];
+    } else {
+      let val = parseInt(valueStr);
+      if (isNaN(val) || val < 1) val = 1;
+      capacities[timeStr] = val;
+    }
+    
+    localStorage.setItem(capacitiesKey, JSON.stringify(capacities));
+    renderAdminSlots(dateStr);
+  }
+
+  function deleteReservation(dateStr, index) {
+    if (!confirm('¿Estás seguro de que deseas eliminar esta reserva?')) return;
+    const resKey = 'nails_reservations_' + dateStr;
+    const reservations = getReservations(dateStr);
+    reservations.splice(index, 1);
+    localStorage.setItem(resKey, JSON.stringify(reservations));
+    renderAdminSlots(dateStr);
+  }
+
+  function toggleSlot(dateStr, timeStr) {
+    const booked = getBookedSlots(dateStr);
+    const index = booked.indexOf(timeStr);
+    if (index > -1) {
+      booked.splice(index, 1);
+    } else {
+      booked.push(timeStr);
+    }
+    localStorage.setItem('nails_booked_' + dateStr, JSON.stringify(booked));
+    renderAdminSlots(dateStr);
+  }
+
+  function renderAdminSlots(dateStr) {
+    const grid = document.getElementById('adminSlotsGrid');
+    grid.innerHTML = '';
+    
+    const d = new Date(dateStr + 'T00:00:00');
+    const dayOfWeek = d.getDay();
+    if (dayOfWeek === 0) {
+      grid.innerHTML = '<p style="color:#ef4444;grid-column:1/-1;text-align:center;padding:20px;">Domingo - El salón está cerrado 🚫</p>';
+      return;
+    }
+    
+    const closeHour = dayOfWeek === 6 ? 18 : 19;
+    const closeMin = dayOfWeek === 6 ? 0 : 30;
+    const booked = getBookedSlots(dateStr);
+    const reservations = getReservations(dateStr);
+    const capacitiesKey = 'nails_capacity_' + dateStr;
+    const capacities = JSON.parse(localStorage.getItem(capacitiesKey) || '{}');
+    const defaultCapacity = parseInt(localStorage.getItem('nails_default_capacity') || '3');
+    
+    for (let h = BUSINESS_HOURS.open; h <= closeHour; h++) {
+      for (let m = 0; m < 60; m += SLOT_INTERVAL) {
+        if (h === closeHour && m > closeMin) break;
+        const timeStr = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+        const isManuallyBlocked = booked.includes(timeStr);
+        
+        const slotReservations = reservations.filter(r => r.time === timeStr);
+        const capacity = getSlotCapacity(dateStr, timeStr);
+        const isFull = isManuallyBlocked || slotReservations.length >= capacity;
+        
+        const card = document.createElement('div');
+        card.className = `admin-slot-card ${isFull ? 'booked' : 'available'}`;
+
+        let clientInfo = '';
+        if (slotReservations.length > 0) {
+          clientInfo = '<div style="margin-top:8px; display:flex; flex-direction:column; gap:4px;">';
+          slotReservations.forEach((res) => {
+            const globalIndex = reservations.indexOf(res);
+            
+            let waBtn = '';
+            if (res.phone) {
+              let phoneClean = res.phone.replace(/\\D/g, '');
+              if (phoneClean.startsWith('0')) phoneClean = phoneClean.substring(1);
+              const waPhone = `595${phoneClean}`;
+              const waMsg = encodeURIComponent(`Hola ${res.name}, te recordamos tu turno de ${res.service} hoy a las ${timeStr} con ${res.staff || 'nosotras'}. Por favor confirma tu asistencia. 💅`);
+              waBtn = `<a href="https://wa.me/${waPhone}?text=${waMsg}" target="_blank" style="display:inline-flex; align-items:center; gap:4px; margin-top:6px; font-size:10px; font-weight:600; color:#22c55e; text-decoration:none; background:rgba(34,197,94,0.1); padding:4px 8px; border-radius:4px;"><i class="fab fa-whatsapp"></i> Recordar Turno</a>`;
+            }
+
+            clientInfo += `<div style="font-size:10px;color:var(--rose);line-height:1.3;text-align:left;padding:6px 8px;background:rgba(224,153,164,0.07);border-radius:6px;position:relative;">
+              <i class="fas fa-user" style="font-size:9px;margin-right:3px;"></i><strong>${res.name}</strong><br>
+              <i class="fas fa-phone" style="font-size:8px;margin-right:3px;"></i><span style="color:#999;">${res.phone || 'Sin tel'}</span><br>
+              <i class="fas fa-hand-sparkles" style="font-size:8px;margin-right:3px;"></i><span style="color:#999;">${res.service}</span><br>
+              <i class="fas fa-user-nurse" style="font-size:8px;margin-right:3px;"></i><span style="color:#999;">${res.staff || 'Cualquiera'}</span>
+              <div>${waBtn}</div>
+              <span onclick="deleteReservation('${dateStr}', ${globalIndex})" style="position:absolute; right:6px; top:6px; color:#ef4444; cursor:pointer; font-size:9px;" title="Eliminar"><i class="fas fa-trash-alt"></i></span>
+            </div>`;
+          });
+          clientInfo += '</div>';
+        }
+        
+        let statusText = 'Disponible';
+        if (isManuallyBlocked) {
+          statusText = 'Bloqueado';
+        } else if (isFull) {
+          statusText = `Lleno (${slotReservations.length}/${capacity})`;
+        } else if (slotReservations.length > 0) {
+          statusText = `Reservado (${slotReservations.length}/${capacity})`;
+        } else {
+          statusText = `Disponible (0/${capacity})`;
+        }
+        
+        const specificCapacityVal = capacities[timeStr] !== undefined ? capacities[timeStr] : '';
+        const capacityInputHtml = `<input type="number" min="1" max="10" placeholder="${defaultCapacity}" value="${specificCapacityVal}" onchange="changeSlotCapacity('${dateStr}', '${timeStr}', this.value)" class="slot-capacity-input" onclick="event.stopPropagation()" title="Capacidad de este turno (vacío usa la general)">`;
+
+        card.innerHTML = `
+          ${capacityInputHtml}
+          <div class="slot-time-large" style="margin-top: 12px;">${timeStr}</div>
+          <div class="slot-status">${statusText}</div>
+          ${clientInfo}
+          <button class="btn-action ${isManuallyBlocked ? 'unblock-btn' : 'block-btn'}" onclick="toggleSlot('${dateStr}', '${timeStr}')" style="margin-top: 10px;">
+            ${isManuallyBlocked ? 'Habilitar' : 'Bloquear'}
+          </button>
+        `;
+        grid.appendChild(card);
+      }
+    }
+  }
+
+  // Obtener precio de servicio
+  function getServicePrice(serviceName) {
+    if (!serviceName) return 0;
+    const lower = serviceName.toLowerCase();
+    if (lower.includes("esculpidas")) return 120000;
+    if (lower.includes("kapping")) return 80000;
+    if (lower.includes("pedicura")) return 70000;
+    if (lower.includes("rusa") || lower.includes("rubber")) return 50000;
+    if (lower.includes("nail art") || lower.includes("art")) return 40000;
+    if (lower.includes("retiro")) return 30000;
+    if (lower.includes("manos + pies") || lower.includes("combo")) return 95000;
+    if (lower.includes("mimos")) return 50000;
+    
+    // Buscar patrón Gs. 120.000 o similar
+    const match = serviceName.match(/Gs\.\s*([\d.]+)/i);
+    if (match) {
+      return parseInt(match[1].replace(/\./g, ''));
+    }
+    // Buscar patrón de números
+    const numMatch = serviceName.match(/\b\d+(\.\d+)?\b/);
+    if (numMatch) {
+      const val = parseInt(numMatch[0].replace(/\./g, ''));
+      if (val > 1000) return val; // Evitar capturar minutos (ej: 45min)
+    }
+    return 50000; // precio por defecto
+  }
+
+  // Obtener lunes de la semana de una fecha
+  function getMonday(d) {
+    const date = new Date(d);
+    const day = date.getDay();
+    const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+    return new Date(date.setDate(diff));
+  }
+
+  // Formateador de moneda en Gs.
+  function formatCurrency(val) {
+    if (val === 0) return '-';
+    return 'Gs. ' + val.toLocaleString('es-PY');
+  }
+
+  // Calcular ganancias en el rango seleccionado
+  function calculateEarnings() {
+    const fromVal = document.getElementById('historyFromInput').value;
+    const toVal = document.getElementById('historyToInput').value;
+    
+    if (!fromVal || !toVal) {
+      alert('Por favor selecciona un rango de fechas válido.');
+      return;
+    }
+    
+    const fromDate = new Date(fromVal + 'T00:00:00');
+    const toDate = new Date(toVal + 'T00:00:00');
+    
+    if (fromDate > toDate) {
+      alert('La fecha "Desde" no puede ser mayor que la fecha "Hasta".');
+      return;
+    }
+    
+    const weeksMap = {};
+    
+    // Inicializar semanas en el mapa para asegurar que figuren en la tabla
+    let temp = new Date(fromDate);
+    while (temp <= toDate) {
+      const mon = getMonday(temp);
+      const sun = new Date(mon);
+      sun.setDate(mon.getDate() + 6);
+      
+      const formatDMY = d => `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+      const weekKey = `${formatDMY(mon)} AL ${formatDMY(sun)}`;
+      
+      if (!weeksMap[weekKey]) {
+        weeksMap[weekKey] = { 1: {sum:0, counts:{}}, 2: {sum:0, counts:{}}, 3: {sum:0, counts:{}}, 4: {sum:0, counts:{}}, 5: {sum:0, counts:{}}, 6: {sum:0, counts:{}}, mondayTime: mon.getTime() };
+      }
+      temp.setDate(temp.getDate() + 7);
+    }
+    
+    // Asegurar última semana
+    const lastMon = getMonday(toDate);
+    const lastSun = new Date(lastMon);
+    lastSun.setDate(lastMon.getDate() + 6);
+    const formatDMY = d => `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+    const lastWeekKey = `${formatDMY(lastMon)} AL ${formatDMY(lastSun)}`;
+    if (!weeksMap[lastWeekKey]) {
+      weeksMap[lastWeekKey] = { 1: {sum:0, counts:{}}, 2: {sum:0, counts:{}}, 3: {sum:0, counts:{}}, 4: {sum:0, counts:{}}, 5: {sum:0, counts:{}}, 6: {sum:0, counts:{}}, mondayTime: lastMon.getTime() };
+    }
+    
+    // Recorrer día a día sumando cobros y servicios
+    let loop = new Date(fromDate);
+    let totalRango = 0;
+    const globalServiceCounts = {};
+    const staffCommissions = {};
+    
+    while (loop <= toDate) {
+      const dateStr = loop.toISOString().split('T')[0];
+      const dayOfWeek = loop.getDay();
+      
+      if (dayOfWeek !== 0) { // Omitir domingos
+        const reservations = JSON.parse(localStorage.getItem('nails_reservations_' + dateStr) || '[]');
+        if (reservations.length > 0) {
+          const mon = getMonday(loop);
+          const sun = new Date(mon);
+          sun.setDate(mon.getDate() + 6);
+          const formatDMY = d => `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+          const weekKey = `${formatDMY(mon)} AL ${formatDMY(sun)}`;
+          
+          let dailySum = 0;
+          const dailyServiceCounts = {};
+          
+          reservations.forEach(res => {
+            const price = getServicePrice(res.service);
+            dailySum += price;
+            
+            const staffName = res.staff || 'Cualquiera';
+            staffCommissions[staffName] = (staffCommissions[staffName] || 0) + price;
+            
+            // Limpiar nombre del servicio para contar
+            let baseName = res.service.split('(')[0].split('–')[0].replace('Promo:', '').trim();
+            dailyServiceCounts[baseName] = (dailyServiceCounts[baseName] || 0) + 1;
+            globalServiceCounts[baseName] = (globalServiceCounts[baseName] || 0) + 1;
+          });
+          
+          if (weeksMap[weekKey]) {
+            weeksMap[weekKey][dayOfWeek] = {
+              sum: dailySum,
+              counts: dailyServiceCounts
+            };
+          }
+          totalRango += dailySum;
+        }
+      }
+      loop.setDate(loop.getDate() + 1);
+    }
+    
+    // Calcular top 5 servicios
+    const sortedServices = Object.entries(globalServiceCounts).sort((a, b) => b[1] - a[1]);
+    const topContainer = document.getElementById('topServicesContainer');
+    topContainer.innerHTML = '';
+    
+    if (sortedServices.length === 0) {
+      topContainer.innerHTML = '<div style="color: white; font-size: 13px; font-weight: 600;">-</div>';
+    } else {
+      const top5 = sortedServices.slice(0, 5);
+      top5.forEach((item, index) => {
+        const srv = item[0];
+        const count = item[1];
+        topContainer.innerHTML += `
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+            <span style="font-weight: 700; color: white; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px;" title="${srv}">${index + 1}. ${srv}</span>
+            <span style="font-size: 11px; color: var(--rose); font-weight: 600;">(${count})</span>
+          </div>
+        `;
+      });
+    }
+
+    // Renderizar Tabla de Gestión de Staff
+    if (typeof renderStaffTable === 'function') {
+      renderStaffTable(staffCommissions);
+    }
+
+    // Función auxiliar para renderizar celda
+    const renderCell = (dayData) => {
+       if (dayData.sum === 0) return '-';
+       let html = `<div style="font-weight:600;">${formatCurrency(dayData.sum)}</div>`;
+       let servicesHtml = '';
+       for (const [srv, count] of Object.entries(dayData.counts)) {
+          servicesHtml += `<div style="font-size: 10px; color: rgba(255,255,255,0.5); font-weight: normal; margin-top: 3px; line-height:1.2; text-transform: uppercase;">${count}x ${srv}</div>`;
+       }
+       return html + servicesHtml;
+    };
+    
+    // Renderizar filas en orden descendente (semana más reciente primero)
+    const tableBody = document.getElementById('historyTableBody');
+    tableBody.innerHTML = '';
+    
+    const sortedWeeks = Object.keys(weeksMap).sort((a, b) => weeksMap[b].mondayTime - weeksMap[a].mondayTime);
+    
+    if (sortedWeeks.length === 0) {
+      tableBody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--gray);">No hay semanas que mostrar en este rango.</td></tr>';
+      document.getElementById('rangeTotalEarnings').textContent = 'Gs. 0';
+      return;
+    }
+    
+    sortedWeeks.forEach(weekKey => {
+      const wData = weeksMap[weekKey];
+      const weekTotal = wData[1].sum + wData[2].sum + wData[3].sum + wData[4].sum + wData[5].sum + wData[6].sum;
+      
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td style="font-weight:600; vertical-align: top;">${weekKey}</td>
+        <td style="vertical-align: top;">${renderCell(wData[1])}</td>
+        <td style="vertical-align: top;">${renderCell(wData[2])}</td>
+        <td style="vertical-align: top;">${renderCell(wData[3])}</td>
+        <td style="vertical-align: top;">${renderCell(wData[4])}</td>
+        <td style="vertical-align: top;">${renderCell(wData[5])}</td>
+        <td style="vertical-align: top;">${renderCell(wData[6])}</td>
+        <td class="weekly-total" style="vertical-align: top; font-size:15px;">${formatCurrency(weekTotal)}</td>
+      `;
+      tableBody.appendChild(tr);
+    });
+    
+    document.getElementById('rangeTotalEarnings').textContent = 'Gs. ' + totalRango.toLocaleString('es-PY');
+  }
+
+  // Exportar a CSV de Excel
+  function exportToExcel() {
+    const table = document.querySelector('.history-table');
+    if (!table) return;
+    
+    let csv = [];
+    const rows = table.querySelectorAll('tr');
+    
+    for (let i = 0; i < rows.length; i++) {
+      const row = [], cols = rows[i].querySelectorAll('td, th');
+      for (let j = 0; j < cols.length; j++) {
+        row.push('"' + cols[j].innerText.trim() + '"');
+      }
+      csv.push(row.join(';'));
+    }
+    
+    const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + csv.join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `historial_cobros_nails.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  // Exportar a PDF usando vista de impresión limpia
+  function exportToPDF() {
+    const printWindow = window.open('', '_blank');
+    const tableHtml = document.querySelector('.history-table').outerHTML;
+    const totalHtml = document.getElementById('rangeTotalEarnings').innerText;
+    const fromVal = document.getElementById('historyFromInput').value;
+    const toVal = document.getElementById('historyToInput').value;
+    
+    const formatDateStr = dateStr => {
+      if (!dateStr) return '';
+      const parts = dateStr.split('-');
+      return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    };
+    
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Historial de Cobros - Vero's Nails</title>
+          <style>
+            body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 40px; color: #111; background: #fff; }
+            .header { border-bottom: 2px solid #E099A4; padding-bottom: 15px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-end; }
+            h2 { font-size: 26px; font-weight: 700; color: #E099A4; margin: 0; text-transform: uppercase; letter-spacing: 1.5px; }
+            .dates { font-size: 14px; color: #666; font-weight: 600; }
+            table { width: 100%; border-collapse: collapse; margin-top: 25px; }
+            th, td { padding: 12px 14px; border-bottom: 1px solid #eee; text-align: left; font-size: 13px; }
+            th { background: #fafafa; font-weight: bold; color: #444; border-top: 1px solid #eee; }
+            td:not(:first-child), th:not(:first-child) { text-align: right; }
+            .weekly-total { font-weight: bold; color: #d06d7c; }
+            .total-box { margin-top: 40px; padding: 20px; background: #e6f7ed; border: 1px solid #b7ebc6; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; font-size: 16px; font-weight: bold; }
+            .total-val { font-size: 22px; color: #0f766e; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div>
+              <h2>Vero's Nails</h2>
+              <div style="font-size:12px;color:#888;margin-top:4px;">REPORTE DE COBROS ESTIMADOS</div>
+            </div>
+            <div class="dates">Rango: ${formatDateStr(fromVal)} al ${formatDateStr(toVal)}</div>
+          </div>
+          ${tableHtml}
+          <div class="total-box">
+            <span>TOTAL RECAUDADO (RANGO):</span>
+            <span class="total-val">${totalHtml}</span>
+          </div>
+          <script>
+            window.onload = function() { window.print(); window.close(); }
+          <\/script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  }
+
+  window.addEventListener('DOMContentLoaded', () => {
+    checkAuth();
+    const today = new Date().toISOString().split('T')[0];
+    
+    const dateInput = document.getElementById('adminDateInput');
+    dateInput.value = today;
+    dateInput.min = today;
+    
+    // Configurar campo de capacidad general
+    const defaultCapInput = document.getElementById('defaultCapacityInput');
+    defaultCapInput.value = localStorage.getItem('nails_default_capacity') || '3';
+    defaultCapInput.addEventListener('change', (e) => {
+      let val = parseInt(e.target.value);
+      if (isNaN(val) || val < 1) val = 1;
+      localStorage.setItem('nails_default_capacity', val);
+      e.target.value = val;
+      renderAdminSlots(document.getElementById('adminDateInput').value);
+    });
+    
+    dateInput.addEventListener('change', (e) => {
+      renderAdminSlots(e.target.value);
+    });
+    
+    // Configurar campos de historial de cobro
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const thirtyDaysAgoStr = thirtyDaysAgo.toISOString().split('T')[0];
+    
+    document.getElementById('historyFromInput').value = thirtyDaysAgoStr;
+    document.getElementById('historyToInput').value = today;
+    
+    calculateEarnings();
+    renderAdminSlots(today);
+    loadMaintenanceList();
+  });
+
+  // Función para cargar clientas que necesitan mantenimiento
+  function loadMaintenanceList() {
+    const container = document.getElementById('maintenanceListContainer');
+    if (!container) return;
+    
+    container.innerHTML = '<div style="color: var(--gray); font-size: 14px;">Buscando mantenimientos pendientes...</div>';
+    
+    const today = new Date();
+    const maintenanceClients = [];
+    
+    // Escanear los últimos 21 a 30 días
+    for (let i = 21; i <= 30; i++) {
+      const pastDate = new Date();
+      pastDate.setDate(today.getDate() - i);
+      const dateStr = pastDate.toISOString().split('T')[0];
+      
+      const reservations = getReservations(dateStr);
+      reservations.forEach(res => {
+        if (res.phone) {
+          maintenanceClients.push({
+            dateStr: dateStr,
+            daysAgo: i,
+            ...res
+          });
+        }
+      });
+    }
+    
+    if (maintenanceClients.length === 0) {
+      container.innerHTML = '<div style="color: var(--gray); font-size: 14px; grid-column:1/-1;"><i class="fas fa-check-circle" style="color:#10b981;"></i> No hay mantenimientos pendientes en este momento. Los próximos avisos aparecerán aquí.</div>';
+      return;
+    }
+    
+    container.innerHTML = '';
+    maintenanceClients.forEach(client => {
+      let phoneClean = client.phone.replace(/\D/g, '');
+      if (phoneClean.startsWith('0')) phoneClean = phoneClean.substring(1);
+      const waPhone = `595${phoneClean}`;
+      
+      const parts = client.dateStr.split('-');
+      const formattedDate = `${parts[2]}/${parts[1]}/${parts[0]}`;
+      const waMsg = encodeURIComponent(`Hola ${client.name} hermosa, hace ${client.daysAgo} días te hiciste el servicio de ${client.service}. Ya es tiempo de tu mantenimiento para que tus uñas sigan perfectas 💅 ¿te agendamos?`);
+      
+      const card = document.createElement('div');
+      card.style.cssText = 'background: rgba(251, 191, 36, 0.05); border: 1px solid rgba(251, 191, 36, 0.2); padding: 16px; border-radius: 8px; display: flex; flex-direction: column; gap: 8px;';
+      
+      card.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+          <strong>${client.name}</strong>
+          <span style="font-size: 11px; background: rgba(251,191,36,0.2); color: #fbbf24; padding: 2px 6px; border-radius: 4px;">Hace ${client.daysAgo} días</span>
+        </div>
+        <div style="font-size: 12px; color: var(--gray);"><i class="fas fa-cut"></i> ${client.service}</div>
+        <div style="font-size: 12px; color: var(--gray);"><i class="fas fa-calendar"></i> Última vez: ${formattedDate}</div>
+        <a href="https://wa.me/${waPhone}?text=${waMsg}" target="_blank" style="display:inline-flex; align-items:center; justify-content:center; gap:6px; margin-top:8px; font-size:12px; font-weight:600; color:#fff; text-decoration:none; background:#22c55e; padding:8px; border-radius:6px; transition:0.2s;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
+          <i class="fab fa-whatsapp"></i> Enviar Aviso
+        </a>
+      `;
+      container.appendChild(card);
+    });
+  }
+
+  // ==================== GESTIÓN DE STAFF ====================
+  function getStaffConfig() {
+    let storedConfig = localStorage.getItem('nails_staff_config');
+    let config = [];
+    if (!storedConfig) {
+      config.push({ id: Date.now().toString(), name: 'Valeria', role: 'Especialista Acrílico', commission: 50 });
+      config.push({ id: (Date.now()+1).toString(), name: 'Sofía', role: 'Especialista Pedicura', commission: 40 });
+      localStorage.setItem('nails_staff_config', JSON.stringify(config));
+    } else {
+      config = JSON.parse(storedConfig);
+    }
+    return config;
+  }
+
+  function renderStaffTable(staffCommissions = {}) {
+    const tbody = document.getElementById('staffTableBody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    
+    const config = getStaffConfig();
+    
+    config.forEach(staff => {
+      const bruto = staffCommissions[staff.name] || 0;
+      const ganancia = bruto * (staff.commission / 100);
+      
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><input type="text" id="staff_name_${staff.id}" value="${staff.name}" style="background:var(--dark4); border:1px solid rgba(255,255,255,0.1); color:white; padding:6px; border-radius:4px; width:120px;"></td>
+        <td><input type="text" id="staff_role_${staff.id}" value="${staff.role}" style="background:var(--dark4); border:1px solid rgba(255,255,255,0.1); color:white; padding:6px; border-radius:4px; width:140px;"></td>
+        <td>
+          <div style="display:flex; align-items:center; gap:4px;">
+            <input type="number" id="staff_comm_${staff.id}" value="${staff.commission}" style="background:var(--dark4); border:1px solid rgba(255,255,255,0.1); color:white; padding:6px; border-radius:4px; width:60px;"> %
+          </div>
+        </td>
+        <td style="color:#fbbf24; font-weight:bold;">${formatCurrency(bruto)}</td>
+        <td style="color:#10b981; font-weight:bold;">${formatCurrency(ganancia)}</td>
+        <td>
+          <button onclick="saveStaff('${staff.id}')" style="background:#3b82f6; border:none; color:white; padding:6px 10px; border-radius:4px; cursor:pointer; margin-right:4px;"><i class="fas fa-save"></i></button>
+          <button onclick="deleteStaff('${staff.id}')" style="background:#ef4444; border:none; color:white; padding:6px 10px; border-radius:4px; cursor:pointer;"><i class="fas fa-trash"></i></button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  function saveStaff(id) {
+    const name = document.getElementById(`staff_name_${id}`).value.trim();
+    const role = document.getElementById(`staff_role_${id}`).value.trim();
+    const comm = parseFloat(document.getElementById(`staff_comm_${id}`).value) || 0;
+    
+    if (!name) return alert('El nombre no puede estar vacío');
+    
+    const config = getStaffConfig();
+    const staffIndex = config.findIndex(s => s.id === id);
+    if (staffIndex !== -1) {
+      config[staffIndex].name = name;
+      config[staffIndex].role = role;
+      config[staffIndex].commission = comm;
+      localStorage.setItem('nails_staff_config', JSON.stringify(config));
+      alert('Staff actualizado guardado correctamente.\\nNota: Si cambiaste el nombre, es posible que los turnos viejos queden asociados al nombre anterior.');
+      calculateEarnings(); // Refresh table
+    }
+  }
+
+  function deleteStaff(id) {
+    if (!confirm('¿Seguro que deseas eliminar a esta manicurista de las opciones?')) return;
+    let config = getStaffConfig();
+    config = config.filter(s => s.id !== id);
+    localStorage.setItem('nails_staff_config', JSON.stringify(config));
+    calculateEarnings();
+  }
+
+  function addNewStaffRow() {
+    let config = getStaffConfig();
+    config.push({ id: Date.now().toString(), name: 'Nueva Manicurista', role: 'Especialidad', commission: 50 });
+    localStorage.setItem('nails_staff_config', JSON.stringify(config));
+    calculateEarnings();
+  }
+
+  // ==================== MODO EDICIÓN WEB ====================
+  function updateEditModeButton() {
+    const btn = document.getElementById('btnEditMode');
+    if (!btn) return;
+    const isEdit = localStorage.getItem('nails_edit_mode') === 'true';
+    if (isEdit) {
+      btn.style.background = '#3b82f6';
+      btn.style.color = '#fff';
+      btn.innerHTML = '<i class="fas fa-check"></i> Modo Edición Activo';
+    } else {
+      btn.style.background = 'transparent';
+      btn.style.color = '#3b82f6';
+      btn.innerHTML = '<i class="fas fa-edit"></i> Modo Edición Web';
+    }
+  }
+
+  function toggleEditMode() {
+    const isEdit = localStorage.getItem('nails_edit_mode') === 'true';
+    localStorage.setItem('nails_edit_mode', !isEdit);
+    updateEditModeButton();
+  }
+  
+  // Call on load (después de login)
+  const originalCheckAuth = window.checkAuth;
+  window.checkAuth = function() {
+    if (originalCheckAuth) originalCheckAuth();
+    updateEditModeButton();
+  };
+  document.addEventListener('DOMContentLoaded', updateEditModeButton);
+</script>
+</body>
+</html>

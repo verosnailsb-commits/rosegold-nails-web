@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vero's Nails | Uñas & Spa de Lujo</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- NAV -->
+<nav id="navbar">
+  <div class="nav-inner">
+    <div class="nav-left">
+      <a href="#" class="logo-link"><img src="logo_veros.png" alt="Vero's Beauty Center" class="brand-logo"></a>
+    </div>
+    <ul class="nav-links">
+      <li><a href="#servicios">Servicios</a></li>
+      <li><a href="#promos">Promos</a></li>
+      <li><a href="#turnos">Turnos</a></li>
+      <li><a href="#contacto">Contacto</a></li>
+    </ul>
+    <div class="nav-right">
+      <a href="#turnos" class="btn-rose">Reservar</a>
+    </div>
+    <button class="burger" onclick="toggleMenu()">MENÚ <i class="fas fa-bars"></i></button>
+  </div>
+  <a href="admin.html" class="admin-fixed-btn"><i class="fas fa-cog"></i> Admin</a>
+  <div class="mobile-menu" id="mobileMenu">
+    <a href="#servicios" onclick="toggleMenu()">Servicios</a>
+    <a href="#promos" onclick="toggleMenu()">Promos</a>
+    <a href="#turnos" onclick="toggleMenu()">Turnos</a>
+    <a href="#contacto" onclick="toggleMenu()">Contacto</a>
+  </div>
+</nav>
+
+<!-- HERO SLIDER -->
+<section id="hero" class="hero-slider-section">
+  <div class="slider-container" id="heroSlider">
+    <!-- Slide 1 -->
+    <div class="slide active" style="background-image: url('nail_salon_hero_1780715943865.png');">
+      <div class="hero-overlay"></div>
+      <div class="hero-content">
+        <p class="hero-sub">Experiencia Spa · Uñas Impecables</p>
+        <h1>El Detalle que<br><span class="rose">Te Hace Brillar</span></h1>
+        <p class="hero-desc">Salón de uñas premium con las últimas tendencias.<br>Estilo, cuidado y sofisticación en tus manos.</p>
+        <div class="hero-btns">
+          <a href="#turnos" class="btn-rose">Reservar Turno</a>
+          <a href="#servicios" class="btn-outline">Ver Servicios</a>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Slide 2 -->
+    <div class="slide" style="background-image: url('hero_promo_1.png');">
+      <div class="hero-overlay"></div>
+      <div class="hero-content">
+        <p class="hero-sub">Nueva Colección</p>
+        <h1>Manos que<br><span class="rose">Impactan</span></h1>
+        <p class="hero-desc">Descubre nuestras promociones exclusivas en esculpidas y diseños artísticos.</p>
+        <div class="hero-btns">
+          <a href="#promos" class="btn-rose">Ver Ofertas</a>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Slide 3 -->
+    <div class="slide" style="background-image: url('hero_promo_2.png');">
+      <div class="hero-overlay"></div>
+      <div class="hero-content">
+        <p class="hero-sub">Relajación Total</p>
+        <h1>Pedicura<br><span class="rose">Spa VIP</span></h1>
+        <p class="hero-desc">Sumerge tus pies en un mundo de relajación profunda con nuestra promo especial.</p>
+        <div class="hero-btns">
+          <a href="#turnos" class="btn-rose">Reservar Spa</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Navigation Arrows like Criterion -->
+  <div class="slider-nav-arrows">
+    <button class="nav-arrow prev" onclick="moveSlide(-1)"><i class="fas fa-chevron-left"></i></button>
+    <button class="nav-arrow next" onclick="moveSlide(1)"><i class="fas fa-chevron-right"></i></button>
+  </div>
+  
+  <div class="hero-scroll"><i class="fas fa-chevron-down"></i></div>
+</section>
+
+<!-- STATS -->
+<section class="stats-bar">
+  <div class="stat"><span class="num rose">400+</span><span>Clientes Felices</span></div>
+  <div class="stat-div"></div>
+  <div class="stat"><span class="num rose">6</span><span>Años Embelleciendo</span></div>
+  <div class="stat-div"></div>
+  <div class="stat"><span class="num rose">12+</span><span>Servicios VIP</span></div>
+  <div class="stat-div"></div>
+  <div class="stat"><span class="num rose">100%</span><span>Calidad & Higiene</span></div>
+</section>
+
+<!-- SERVICIOS -->
+<section id="servicios" class="section">
+  <div class="section-header">
+    <p class="section-tag">Nuestros Servicios</p>
+    <h2>Estilo & <span class="rose">Cuidado</span></h2>
+  </div>
+  <div class="services-grid" id="servicesGridContainer">
+    <!-- Rendered via JS -->
+  </div>
+</section>
+
+<!-- PROMOS -->
+<section id="promos" class="section dark-section">
+  <div class="section-header">
+    <p class="section-tag">Ofertas del Mes</p>
+    <h2>Promociones <span class="rose">Especiales</span></h2>
+  </div>
+  <div class="promos-grid" id="promosGridContainer">
+    <!-- Rendered via JS -->
+  </div>
+</section>
+
+<!-- RESERVAS -->
+<section id="turnos" class="section">
+  <div class="section-header">
+    <p class="section-tag">Sistema de Turnos</p>
+    <h2>Reservá tu <span class="rose">Turno</span></h2>
+    <p class="section-desc">Seleccioná fecha y hora. Si el turno está disponible, confirmá por WhatsApp al instante.</p>
+  </div>
+  <div class="booking-container">
+    <div class="booking-form">
+      <div class="form-row">
+        <div class="form-group">
+          <label><i class="fas fa-user"></i> Tu Nombre</label>
+          <input type="text" id="clientName" placeholder="Ej: Sofía Benítez">
+        </div>
+        <div class="form-group">
+          <label><i class="fab fa-whatsapp"></i> Teléfono</label>
+          <input type="tel" id="clientPhone" placeholder="098X XXX XXX">
+        </div>
+      </div>
+      <div class="form-group">
+        <label><i class="fas fa-hand-sparkles"></i> Servicio</label>
+        <select id="serviceSelect">
+          <option value="">-- Seleccionar --</option>
+          <!-- Dynamic options -->
+        </select>
+      </div>
+      <div class="form-group" id="staffGroup">
+        <label><i class="fas fa-user-nurse"></i> Elegí Manicurista</label>
+        <select id="staffSelect">
+          <option value="Cualquiera">Cualquiera (Turno más rápido)</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label><i class="fas fa-calendar"></i> Fecha</label>
+          <input type="date" id="dateInput" min="">
+        </div>
+        <div class="form-group">
+          <label><i class="fas fa-clock"></i> Hora</label>
+          <select id="timeInput">
+            <option value="">-- Elegí hora --</option>
+          </select>
+        </div>
+      </div>
+      <button class="btn-rose full" onclick="checkAvailability()">
+        <i class="fas fa-search"></i> Verificar Disponibilidad
+      </button>
+    </div>
+
+    <div class="booking-result" id="bookingResult">
+      <div class="result-idle">
+        <i class="fas fa-calendar-check idle-icon"></i>
+        <p>Seleccioná fecha y hora para verificar disponibilidad</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Turnos del día -->
+  <div class="slots-section">
+    <h3>Turnos Disponibles <span class="rose">Hoy</span></h3>
+    <div class="slots-grid" id="slotsGrid"></div>
+    <p class="slots-note"><i class="fas fa-info-circle"></i> Verde = Disponible · Rojo = Ocupado</p>
+  </div>
+</section>
+
+<!-- CONTACTO -->
+<section id="contacto" class="section dark-section">
+  <div class="contact-grid">
+    <div class="contact-info">
+      <p class="section-tag">Encuéntranos</p>
+      <h2>Visítanos o <span class="rose">Escríbenos</span></h2>
+      <div class="contact-item"><i class="fas fa-map-marker-alt rose"></i><div><strong>Dirección</strong><p>Av. España casi Gral. Santos, Asunción, Paraguay</p></div></div>
+      <div class="contact-item"><i class="fas fa-clock rose"></i><div><strong>Horarios</strong><p>Lun–Sáb: 09:00 – 19:30<br>Dom: Cerrado</p></div></div>
+      <div class="contact-item"><i class="fab fa-whatsapp rose"></i><div><strong>WhatsApp</strong><p>+595 983 996 807</p></div></div>
+      <a href="https://wa.me/595983996807?text=Hola! Quiero consultar sobre turnos disponibles en Vero's Nails 💅" target="_blank" class="btn-wa">
+        <i class="fab fa-whatsapp"></i> Contactar por WhatsApp
+      </a>
+    </div>
+    <div class="contact-hours">
+      <h3>Horarios <span class="rose">por Día</span></h3>
+      <table class="hours-table">
+        <tr><td>Lunes</td><td class="rose">09:00 – 19:30</td></tr>
+        <tr><td>Martes</td><td class="rose">09:00 – 19:30</td></tr>
+        <tr><td>Miércoles</td><td class="rose">09:00 – 19:30</td></tr>
+        <tr><td>Jueves</td><td class="rose">09:00 – 19:30</td></tr>
+        <tr><td>Viernes</td><td class="rose">09:00 – 19:30</td></tr>
+        <tr><td>Sábado</td><td class="rose">09:00 – 18:00</td></tr>
+        <tr><td>Domingo</td><td class="unavail">Cerrado</td></tr>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-inner">
+    <a href="#" class="logo-link"><img src="logo_veros.png" alt="Vero's Beauty Center" class="brand-logo footer-logo"></a>
+    <p class="footer-sub">Uñas impecables · Asunción, Paraguay</p>
+    <div class="footer-social">
+      <a href="https://wa.me/595983996807" target="_blank"><i class="fab fa-whatsapp"></i></a>
+      <a href="#"><i class="fab fa-instagram"></i></a>
+      <a href="#"><i class="fab fa-facebook"></i></a>
+      <a href="#"><i class="fab fa-tiktok"></i></a>
+    </div>
+    <p class="footer-copy">© 2026 Vero's Beauty Center. Todos los derechos reservados.</p>
+  </div>
+</footer>
+
+<!-- WhatsApp Float -->
+<a href="https://wa.me/595983996807?text=Hola! Quiero reservar un turno en Vero's Nails 💅" target="_blank" class="wa-float">
+  <i class="fab fa-whatsapp"></i>
+</a>
+
+<!-- MODAL EDICIÓN DE SERVICIOS -->
+<div class="login-overlay" id="editModal" style="display:none; align-items:flex-start; padding-top: 50px; overflow-y:auto; z-index: 3000;">
+  <div class="login-card" style="margin: 0 auto; max-width: 600px; padding: 30px;">
+    <h2 id="editModalTitle" style="color:var(--rose); margin-bottom: 20px;">Editar Elemento</h2>
+    
+    <input type="hidden" id="editItemId">
+    <input type="hidden" id="editItemType"> <!-- 'service' or 'promo' -->
+    
+    <!-- Image Upload Area -->
+    <div style="margin-bottom: 20px; text-align: center;">
+      <div id="imagePreview" style="width:100%; height:350px; background:var(--dark4); border-radius:12px; margin-bottom:10px; border:2px dashed rgba(255,255,255,0.2); display:flex; align-items:center; justify-content:center; overflow:hidden; position:relative; cursor:pointer;" onclick="document.getElementById('editImageInput').click()">
+        <span id="imagePreviewPlaceholder" style="color:var(--gray);"><i class="fas fa-camera fa-2x"></i><br><br>Subir Foto (Click)</span>
+        <img id="imagePreviewImg" style="display:none; width:100%; height:100%; object-fit:cover;">
+      </div>
+      <input type="file" id="editImageInput" accept="image/*" style="display:none;" onchange="handleImageUpload(event)">
+      <button class="btn-outline" style="font-size:11px; padding:4px 10px;" onclick="document.getElementById('editImageInput').value=''; document.getElementById('imagePreviewImg').src=''; document.getElementById('imagePreviewImg').style.display='none'; document.getElementById('imagePreviewPlaceholder').style.display='block';">Quitar Foto</button>
+      <p style="font-size: 11px; color: var(--gray); margin-top: 12px; margin-bottom: 0;"><i class="fas fa-info-circle" style="margin-right: 4px;"></i>Tamaño recomendado: <strong>800 x 500 píxeles</strong> (Formato Horizontal)</p>
+    </div>
+    
+    <div class="login-group">
+      <label>Título</label>
+      <input type="text" id="editTitle" placeholder="Ej: Manicura Rusa">
+    </div>
+    
+    <div class="login-group">
+      <label>Descripción</label>
+      <input type="text" id="editDesc" placeholder="Descripción breve...">
+    </div>
+    
+    <div class="login-group">
+      <label>Precio / Oferta (Texto libre)</label>
+      <input type="text" id="editPrice" placeholder="Ej: Gs. 50.000 / ¡20% OFF!">
+    </div>
+    
+    <div class="login-group">
+      <label>Duración / Información Adicional</label>
+      <input type="text" id="editTime" placeholder="Ej: 45 min / Bebida Incluida">
+    </div>
+    
+    <!-- Extras para Promos o Features -->
+    <div class="login-group" style="display:flex; gap:10px;">
+      <div style="flex:1;">
+        <label>Etiqueta Superior (Opcional)</label>
+        <input type="text" id="editBadge" placeholder="Ej: MÁS POPULAR">
+      </div>
+      <div style="flex:1;">
+        <label>Ícono FontAwesome (Si no hay foto)</label>
+        <input type="text" id="editIcon" placeholder="Ej: fa-gem">
+      </div>
+    </div>
+    
+    <div style="display:flex; gap:10px; margin-top:20px;">
+      <button class="btn-rose full" style="flex:2;" onclick="saveEdit()">Guardar Cambios</button>
+      <button class="btn-outline" style="flex:1;" onclick="closeEditModal()">Cancelar</button>
+    </div>
+    <div style="margin-top:20px; text-align:right;">
+      <button class="btn-outline" style="border-color:#ef4444; color:#ef4444; font-size:12px; padding:6px 12px;" onclick="deleteEditItem()"><i class="fas fa-trash"></i> Eliminar</button>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
