@@ -431,15 +431,30 @@ async function renderDynamicCatalog() {
     const { data: pData } = await supabaseClient.from('rosegold_promos').select('*').order('created_at', { ascending: true });
     if (pData) promos = pData;
     
+    // Extract global settings
+    const settingsObj = services.find(s => s.id === 'settings_global');
+    if (settingsObj) {
+      services = services.filter(s => s.id !== 'settings_global');
+      try {
+        window.globalSettings = JSON.parse(settingsObj.title);
+        applyGlobalSettings(window.globalSettings);
+      } catch(e) {}
+    } else {
+      window.globalSettings = getDefaultSettings();
+      applyGlobalSettings(window.globalSettings);
+    }
+    
     // Guardar copia local por si acaso para el admin
     localStorage.setItem('nails_services_data', JSON.stringify(services));
     localStorage.setItem('nails_promos_data', JSON.stringify(promos));
   } catch (e) {
     return renderDynamicCatalogLocal();
   }
-// Rest of render logic using the fetched variables
-  // Helper para manejar image vs image
   
+  const editSettingsBtn = document.getElementById('editSettingsBtn');
+  if (editSettingsBtn) editSettingsBtn.style.display = isEditMode ? 'inline-block' : 'none';
+  
+  // Helper para manejar image vs image
   // Render Services
   const sContainer = document.getElementById('servicesGridContainer');
   if (sContainer) {
@@ -448,7 +463,10 @@ async function renderDynamicCatalog() {
       const imgPath = item.image || item.image;
       const imgHtml = imgPath ? `<img src="${imgPath}" class="service-image" alt="${item.title}">` : `<div class="service-icon"><i class="fas ${item.icon}"></i></div>`;
       const badgeHtml = item.badge ? `<div class="badge">${item.badge}</div>` : '';
-      const editBtn = isEditMode ? `<button class="edit-overlay-btn" onclick="openEditModal('service', '${item.id}')"><i class="fas fa-pencil-alt"></i> EDITAR</button>` : '';
+      const editBtn = isEditMode ? `
+        <button class="edit-overlay-btn" onclick="openEditModal('service', '${item.id}')"><i class="fas fa-pencil-alt"></i> EDITAR</button>
+        <button class="edit-overlay-btn" style="left:10px; right:auto; background:rgba(239, 68, 68, 0.9);" onclick="deleteItemDirectly('service', '${item.id}', event)"><i class="fas fa-trash"></i></button>
+      ` : '';
       
       const valForSelect = `${item.title} (${item.time || 'Promo'})`;
       
@@ -485,7 +503,10 @@ async function renderDynamicCatalog() {
       const imgHtml = imgPath ? `<img src="${imgPath}" class="promo-image" alt="${item.title}">` : `<div class="promo-icon"><i class="fas ${item.icon}"></i></div>`;
       const badgeClass = item.isHot ? 'promo-badge hot' : 'promo-badge';
       const badgeHtml = item.badge ? `<div class="${badgeClass}">${item.badge}</div>` : '';
-      const editBtn = isEditMode ? `<button class="edit-overlay-btn" onclick="openEditModal('promo', '${item.id}')"><i class="fas fa-pencil-alt"></i> EDITAR</button>` : '';
+      const editBtn = isEditMode ? `
+        <button class="edit-overlay-btn" onclick="openEditModal('promo', '${item.id}')"><i class="fas fa-pencil-alt"></i> EDITAR</button>
+        <button class="edit-overlay-btn" style="left:10px; right:auto; background:rgba(239, 68, 68, 0.9);" onclick="deleteItemDirectly('promo', '${item.id}', event)"><i class="fas fa-trash"></i></button>
+      ` : '';
       const cardClass = item.isHot ? 'promo-card rose-card' : 'promo-card';
       
       const valForSelect = `Promo: ${item.title}`;
@@ -754,3 +775,157 @@ async function deleteEditItem() {
     }
   }
 }
+// ---- Lógica de Ajustes Globales ----
+function getDefaultSettings() {
+  return {
+    address: 'Av. España casi Gral. Santos, Asunción, Paraguay',
+    scheduleShort: 'Lun–Sáb: 09:00 – 19:30\nDom: Cerrado',
+    whatsapp: '+595 983 996 807',
+    scheduleMap: {
+      lunes: '09:00 – 19:30',
+      martes: '09:00 – 19:30',
+      miercoles: '09:00 – 19:30',
+      jueves: '09:00 – 19:30',
+      viernes: '09:00 – 19:30',
+      sabado: '09:00 – 18:00',
+      domingo: 'Cerrado'
+    }
+  };
+}
+
+function applyGlobalSettings(settings) {
+  // Update Contact Info
+  const addressEl = document.querySelector('.contact-item i.fa-map-marker-alt')?.nextElementSibling?.querySelector('p');
+  if (addressEl) addressEl.textContent = settings.address;
+  
+  const scheduleShortEl = document.querySelector('.contact-item i.fa-clock')?.nextElementSibling?.querySelector('p');
+  if (scheduleShortEl) scheduleShortEl.innerHTML = settings.scheduleShort.replace(/\n/g, '<br>');
+  
+  const waEl = document.querySelector('.contact-item i.fa-whatsapp.rose')?.nextElementSibling?.querySelector('p');
+  if (waEl) waEl.textContent = settings.whatsapp;
+  
+  // Update WA links
+  const numOnly = settings.whatsapp.replace(/\D/g, '');
+  document.querySelectorAll('a.btn-wa, a.wa-float').forEach(a => {
+    const text = a.href.split('text=')[1] || '';
+    a.href = `https://wa.me/${numOnly}?text=${text}`;
+  });
+  
+  // Update Hours Table
+  const tableRows = document.querySelectorAll('.hours-table tr');
+  if (tableRows.length >= 7) {
+    const days = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'];
+    days.forEach((day, index) => {
+      const cell = tableRows[index].querySelector('td:last-child');
+      if (cell) {
+        cell.textContent = settings.scheduleMap[day];
+        if (settings.scheduleMap[day].toLowerCase().includes('cerrado')) {
+          cell.className = 'unavail';
+        } else {
+          cell.className = 'rose';
+        }
+      }
+    });
+  }
+}
+
+function openSettingsModal() {
+  const set = window.globalSettings || getDefaultSettings();
+  document.getElementById('setAddress').value = set.address;
+  document.getElementById('setScheduleShort').value = set.scheduleShort;
+  document.getElementById('setWhatsapp').value = set.whatsapp;
+  
+  document.getElementById('setLunes').value = set.scheduleMap.lunes;
+  document.getElementById('setMartes').value = set.scheduleMap.martes;
+  document.getElementById('setMiercoles').value = set.scheduleMap.miercoles;
+  document.getElementById('setJueves').value = set.scheduleMap.jueves;
+  document.getElementById('setViernes').value = set.scheduleMap.viernes;
+  document.getElementById('setSabado').value = set.scheduleMap.sabado;
+  document.getElementById('setDomingo').value = set.scheduleMap.domingo;
+  
+  document.getElementById('editSettingsModal').style.display = 'flex';
+}
+
+function closeSettingsModal() {
+  document.getElementById('editSettingsModal').style.display = 'none';
+}
+
+async function saveSettings() {
+  const setBtn = document.getElementById('saveSettingsBtn');
+  setBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
+  setBtn.disabled = true;
+  
+  try {
+    const newSettings = {
+      address: document.getElementById('setAddress').value,
+      scheduleShort: document.getElementById('setScheduleShort').value,
+      whatsapp: document.getElementById('setWhatsapp').value,
+      scheduleMap: {
+        lunes: document.getElementById('setLunes').value,
+        martes: document.getElementById('setMartes').value,
+        miercoles: document.getElementById('setMiercoles').value,
+        jueves: document.getElementById('setJueves').value,
+        viernes: document.getElementById('setViernes').value,
+        sabado: document.getElementById('setSabado').value,
+        domingo: document.getElementById('setDomingo').value
+      }
+    };
+    
+    // Check if it exists
+    const { data } = await supabaseClient.from('rosegold_services').select('id').eq('id', 'settings_global').limit(1);
+    
+    if (data && data.length > 0) {
+      await supabaseClient.from('rosegold_services').update({ title: JSON.stringify(newSettings) }).eq('id', 'settings_global');
+    } else {
+      await supabaseClient.from('rosegold_services').insert([{
+        id: 'settings_global',
+        title: JSON.stringify(newSettings),
+        desc: 'Configuraciones globales',
+        price: '', time: '', badge: '', icon: ''
+      }]);
+    }
+    
+    window.globalSettings = newSettings;
+    applyGlobalSettings(newSettings);
+    closeSettingsModal();
+  } catch (err) {
+    console.error(err);
+    alert("Error al guardar ajustes: " + err.message);
+  } finally {
+    setBtn.innerHTML = 'Guardar Cambios';
+    setBtn.disabled = false;
+  }
+}
+
+async function deleteItemDirectly(type, id, event) {
+  event.stopPropagation(); // Evitar que se abra otro modal o link
+  
+  if (!confirm("¿Estás seguro de que deseas eliminar este elemento?")) return;
+  
+  try {
+    const table = type === 'service' ? 'rosegold_services' : 'rosegold_promos';
+    
+    // Intentar borrar imagen si existe
+    const list = JSON.parse(localStorage.getItem(`nails_${type}s_data`) || '[]');
+    const oldItem = list.find(x => x.id === id);
+    if (oldItem && oldItem.image && oldItem.image.includes('supabase')) {
+       const oldFileName = oldItem.image.split('/').pop();
+       await supabaseClient.storage.from('rosegold_images').remove([oldFileName]);
+    }
+    
+    // Borrar registro
+    await supabaseClient.from(table).delete().eq('id', id);
+    
+    // Refrescar
+    await initDynamicCatalog();
+  } catch (err) {
+    console.error("Error delete:", err);
+    alert("Error al eliminar: " + err.message);
+  }
+}
+
+// Attach functions to window if not already
+window.openSettingsModal = openSettingsModal;
+window.closeSettingsModal = closeSettingsModal;
+window.saveSettings = saveSettings;
+window.deleteItemDirectly = deleteItemDirectly;

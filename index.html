@@ -205,7 +205,9 @@
   <div class="contact-grid">
     <div class="contact-info">
       <p class="section-tag">Encuéntranos</p>
-      <h2>Visítanos o <span class="rose">Escríbenos</span></h2>
+      <h2>Visítanos o <span class="rose">Escríbenos</span>
+        <button id="editSettingsBtn" class="edit-overlay-btn" style="position:relative; display:none; top:auto; right:auto; margin-left: 10px;" onclick="openSettingsModal()"><i class="fas fa-pencil-alt"></i> EDITAR</button>
+      </h2>
       <div class="contact-item"><i class="fas fa-map-marker-alt rose"></i><div><strong>Dirección</strong><p>Av. España casi Gral. Santos, Asunción, Paraguay</p></div></div>
       <div class="contact-item"><i class="fas fa-clock rose"></i><div><strong>Horarios</strong><p>Lun–Sáb: 09:00 – 19:30<br>Dom: Cerrado</p></div></div>
       <div class="contact-item"><i class="fab fa-whatsapp rose"></i><div><strong>WhatsApp</strong><p>+595 983 996 807</p></div></div>
@@ -308,6 +310,68 @@
     </div>
   </div>
 </div>
+
+<!-- MODAL EDICIÓN DE CONFIGURACIONES GLOBALES -->
+<div class="login-overlay" id="editSettingsModal" style="display:none; align-items:flex-start; padding-top: 50px; overflow-y:auto; z-index: 3000;">
+  <div class="login-card" style="margin: 0 auto; max-width: 600px; padding: 30px;">
+    <h2 style="color:var(--rose); margin-bottom: 20px;">Editar Configuración General</h2>
+    
+    <div class="login-group">
+      <label>Dirección del Local</label>
+      <input type="text" id="setAddress" placeholder="Av. España...">
+    </div>
+    
+    <div class="login-group">
+      <label>Teléfono de WhatsApp (Ej: +595 983 996 807)</label>
+      <input type="text" id="setWhatsapp" placeholder="+595 ...">
+    </div>
+    
+    <div class="login-group">
+      <label>Resumen de Horarios (Ej: Lun-Sáb 09 a 19)</label>
+      <textarea id="setScheduleShort" style="width:100%; background:var(--dark4); border:1px solid rgba(255,255,255,0.1); color:white; padding:12px 16px; border-radius:8px; outline:none; font-size:15px; font-family:'Inter',sans-serif; resize:vertical; min-height:60px;"></textarea>
+    </div>
+    
+    <hr style="border-color: rgba(224,153,164,0.2); margin: 24px 0;">
+    <h3 style="color:var(--white); font-size: 16px; margin-bottom: 16px; text-align: left; font-family:'Playfair Display', serif;">Tabla de Horarios</h3>
+    
+    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+      <div class="login-group">
+        <label>Lunes</label>
+        <input type="text" id="setLunes" placeholder="09:00 - 19:30">
+      </div>
+      <div class="login-group">
+        <label>Martes</label>
+        <input type="text" id="setMartes" placeholder="09:00 - 19:30">
+      </div>
+      <div class="login-group">
+        <label>Miércoles</label>
+        <input type="text" id="setMiercoles" placeholder="09:00 - 19:30">
+      </div>
+      <div class="login-group">
+        <label>Jueves</label>
+        <input type="text" id="setJueves" placeholder="09:00 - 19:30">
+      </div>
+      <div class="login-group">
+        <label>Viernes</label>
+        <input type="text" id="setViernes" placeholder="09:00 - 19:30">
+      </div>
+      <div class="login-group">
+        <label>Sábado</label>
+        <input type="text" id="setSabado" placeholder="09:00 - 18:00">
+      </div>
+      <div class="login-group" style="grid-column: 1 / -1;">
+        <label>Domingo</label>
+        <input type="text" id="setDomingo" placeholder="Cerrado">
+      </div>
+    </div>
+    
+    <div style="display:flex; gap:10px; margin-top:20px;">
+      <button class="btn-rose full" style="flex:2;" id="saveSettingsBtn" onclick="saveSettings()">Guardar Cambios</button>
+      <button class="btn-outline" style="flex:1;" onclick="closeSettingsModal()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="app.js"></script>
 </body>
