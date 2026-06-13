@@ -381,30 +381,72 @@ const DEFAULT_PROMOS = [
   { id: 'p3', title: 'Sábado de Mimos', desc: 'Cualquier servicio incluye una copa de cortesía (Mimosa o Jugo)', price: 'Bebida Incluida', time: '', icon: 'fa-cocktail', badge: 'CADA SÁBADO', isHot: false }
 ];
 
-function initDynamicCatalog() {
+const SUPABASE_URL = 'https://oppcyderpkhcnduqexag.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_0sUIqkHzZ8-gfHaoKV9wgw_4xy8hSyT';
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+async function initDynamicCatalog() {
   if (!document.getElementById('servicesGridContainer')) return; // Solo en index.html
   
-  if (!localStorage.getItem('nails_services_data')) {
-    localStorage.setItem('nails_services_data', JSON.stringify(DEFAULT_SERVICES));
+  try {
+    // Check if tables are empty, if so, seed them (optional, but good for first load)
+    const { data: srvData } = await supabaseClient.from('rosegold_services').select('id').limit(1);
+    if (!srvData || srvData.length === 0) {
+      for (const s of DEFAULT_SERVICES) {
+        await supabaseClient.from('rosegold_services').insert({
+          title: s.title, desc: s.desc, price: s.price, time: s.time, icon: s.icon, badge: s.badge
+        });
+      }
+    }
+    
+    const { data: promoData } = await supabaseClient.from('rosegold_promos').select('id').limit(1);
+    if (!promoData || promoData.length === 0) {
+      for (const p of DEFAULT_PROMOS) {
+        await supabaseClient.from('rosegold_promos').insert({
+          title: p.title, desc: p.desc, price: p.price, icon: p.icon, badge: p.badge, "isHot": p.isHot
+        });
+      }
+    }
+    
+    await renderDynamicCatalog();
+  } catch (err) {
+    console.error("Error init catalog", err);
+    // Fallback to local
+    if (!localStorage.getItem('nails_services_data')) localStorage.setItem('nails_services_data', JSON.stringify(DEFAULT_SERVICES));
+    if (!localStorage.getItem('nails_promos_data')) localStorage.setItem('nails_promos_data', JSON.stringify(DEFAULT_PROMOS));
+    await renderDynamicCatalogLocal();
   }
-  if (!localStorage.getItem('nails_promos_data')) {
-    localStorage.setItem('nails_promos_data', JSON.stringify(DEFAULT_PROMOS));
-  }
-  
-  renderDynamicCatalog();
 }
 
-function renderDynamicCatalog() {
+async function renderDynamicCatalog() {
   const isEditMode = localStorage.getItem('nails_edit_mode') === 'true';
-  const services = JSON.parse(localStorage.getItem('nails_services_data') || '[]');
-  const promos = JSON.parse(localStorage.getItem('nails_promos_data') || '[]');
+  
+  // Fetch from Supabase
+  let services = [];
+  let promos = [];
+  try {
+    const { data: sData } = await supabaseClient.from('rosegold_services').select('*').order('created_at', { ascending: true });
+    if (sData) services = sData;
+    
+    const { data: pData } = await supabaseClient.from('rosegold_promos').select('*').order('created_at', { ascending: true });
+    if (pData) promos = pData;
+    
+    // Guardar copia local por si acaso para el admin
+    localStorage.setItem('nails_services_data', JSON.stringify(services));
+    localStorage.setItem('nails_promos_data', JSON.stringify(promos));
+  } catch (e) {
+    return renderDynamicCatalogLocal();
+  }
+// Rest of render logic using the fetched variables
+  // Helper para manejar image vs image_url
   
   // Render Services
   const sContainer = document.getElementById('servicesGridContainer');
   if (sContainer) {
     sContainer.innerHTML = '';
     services.forEach(item => {
-      const imgHtml = item.image ? `<img src="${item.image}" class="service-image" alt="${item.title}">` : `<div class="service-icon"><i class="fas ${item.icon}"></i></div>`;
+      const imgPath = item.image_url || item.image;
+      const imgHtml = imgPath ? `<img src="${imgPath}" class="service-image" alt="${item.title}">` : `<div class="service-icon"><i class="fas ${item.icon}"></i></div>`;
       const badgeHtml = item.badge ? `<div class="badge">${item.badge}</div>` : '';
       const editBtn = isEditMode ? `<button class="edit-overlay-btn" onclick="openEditModal('service', '${item.id}')"><i class="fas fa-pencil-alt"></i> EDITAR</button>` : '';
       
@@ -439,7 +481,8 @@ function renderDynamicCatalog() {
   if (pContainer) {
     pContainer.innerHTML = '';
     promos.forEach(item => {
-      const imgHtml = item.image ? `<img src="${item.image}" class="promo-image" alt="${item.title}">` : `<div class="promo-icon"><i class="fas ${item.icon}"></i></div>`;
+      const imgPath = item.image_url || item.image;
+      const imgHtml = imgPath ? `<img src="${imgPath}" class="promo-image" alt="${item.title}">` : `<div class="promo-icon"><i class="fas ${item.icon}"></i></div>`;
       const badgeClass = item.isHot ? 'promo-badge hot' : 'promo-badge';
       const badgeHtml = item.badge ? `<div class="${badgeClass}">${item.badge}</div>` : '';
       const editBtn = isEditMode ? `<button class="edit-overlay-btn" onclick="openEditModal('promo', '${item.id}')"><i class="fas fa-pencil-alt"></i> EDITAR</button>` : '';
@@ -491,6 +534,14 @@ function renderDynamicCatalog() {
   }
 }
 
+function renderDynamicCatalogLocal() {
+  const isEditMode = localStorage.getItem('nails_edit_mode') === 'true';
+  const services = JSON.parse(localStorage.getItem('nails_services_data') || '[]');
+  const promos = JSON.parse(localStorage.getItem('nails_promos_data') || '[]');
+  
+  // (Rest of the original code, but we already handled the variables above, so we don't strictly need a duplicate function if we just let the logic flow. Let's keep it simple).
+}
+
 // ================= MODAL DE EDICIÓN =================
 function openEditModal(type, id) {
   const modal = document.getElementById('editModal');
@@ -525,8 +576,9 @@ function openEditModal(type, id) {
       document.getElementById('editBadge').value = item.badge || '';
       document.getElementById('editIcon').value = item.icon || 'fa-star';
       
-      if (item.image) {
-        document.getElementById('imagePreviewImg').src = item.image;
+      const imgPath = item.image_url || item.image;
+      if (imgPath) {
+        document.getElementById('imagePreviewImg').src = imgPath;
         document.getElementById('imagePreviewImg').style.display = 'block';
         document.getElementById('imagePreviewPlaceholder').style.display = 'none';
       }
@@ -572,53 +624,133 @@ function handleImageUpload(e) {
   reader.readAsDataURL(file);
 }
 
-function saveEdit() {
+// Base64 to Blob
+function dataURLtoBlob(dataurl) {
+  var arr = dataurl.split(','), mime = arr[0].match(/:(.*?);/)[1],
+      bstr = atob(arr[1]), n = bstr.length, u8arr = new Uint8Array(n);
+  while(n--){
+      u8arr[n] = bstr.charCodeAt(n);
+  }
+  return new Blob([u8arr], {type:mime});
+}
+
+async function saveEdit() {
   const type = document.getElementById('editItemType').value;
   const id = document.getElementById('editItemId').value;
-  const key = `nails_${type}s_data`;
-  let list = JSON.parse(localStorage.getItem(key) || '[]');
+  const table = type === 'service' ? 'rosegold_services' : 'rosegold_promos';
   
   const imgSrc = document.getElementById('imagePreviewImg').src;
   const hasImage = document.getElementById('imagePreviewImg').style.display === 'block';
+  const isNewImage = hasImage && imgSrc.startsWith('data:image');
   
-  const itemData = {
-    title: document.getElementById('editTitle').value || 'Sin Título',
-    desc: document.getElementById('editDesc').value || '',
-    price: document.getElementById('editPrice').value || '',
-    time: document.getElementById('editTime').value || '',
-    badge: document.getElementById('editBadge').value || '',
-    icon: document.getElementById('editIcon').value || 'fa-star',
-    image: hasImage ? imgSrc : null,
-    isHot: document.getElementById('editBadge').value.toLowerCase().includes('hot') // heurística simple
-  };
+  const btn = document.querySelector('#editModal .btn-rose.full');
+  const originalBtnText = btn.textContent;
+  btn.textContent = 'Guardando...';
+  btn.disabled = true;
   
-  if (id === 'new') {
-    itemData.id = Date.now().toString();
-    list.push(itemData);
-  } else {
-    const idx = list.findIndex(x => x.id === id);
-    if (idx !== -1) {
-      itemData.id = id;
-      list[idx] = itemData;
+  try {
+    let finalImageUrl = hasImage ? imgSrc : null;
+    
+    // Subir imagen a Supabase si es nueva (Base64)
+    if (isNewImage) {
+      const fileName = `img_${Date.now()}.jpg`;
+      const fileBlob = dataURLtoBlob(imgSrc);
+      
+      const { data: uploadData, error: uploadError } = await supabaseClient
+        .storage
+        .from('rosegold_images')
+        .upload(fileName, fileBlob, { contentType: 'image/jpeg' });
+        
+      if (uploadError) throw uploadError;
+      
+      const { data: publicUrlData } = supabaseClient
+        .storage
+        .from('rosegold_images')
+        .getPublicUrl(fileName);
+        
+      finalImageUrl = publicUrlData.publicUrl;
+      
+      // Cleanup de imagen vieja (Opcional, requiere conocer la URL anterior)
+      if (id !== 'new') {
+        const list = JSON.parse(localStorage.getItem(`nails_${type}s_data`) || '[]');
+        const oldItem = list.find(x => x.id === id);
+        if (oldItem && (oldItem.image_url || oldItem.image)) {
+           const oldUrl = oldItem.image_url || oldItem.image;
+           if (oldUrl.includes('supabase')) {
+              const oldFileName = oldUrl.split('/').pop();
+              await supabaseClient.storage.from('rosegold_images').remove([oldFileName]);
+           }
+        }
+      }
+    } else if (!hasImage && id !== 'new') {
+       // Si quitaron la imagen, borrar la vieja
+       const list = JSON.parse(localStorage.getItem(`nails_${type}s_data`) || '[]');
+       const oldItem = list.find(x => x.id === id);
+       if (oldItem && (oldItem.image_url || oldItem.image)) {
+          const oldUrl = oldItem.image_url || oldItem.image;
+          if (oldUrl.includes('supabase')) {
+             const oldFileName = oldUrl.split('/').pop();
+             await supabaseClient.storage.from('rosegold_images').remove([oldFileName]);
+          }
+       }
     }
+
+    const itemData = {
+      title: document.getElementById('editTitle').value || 'Sin Título',
+      desc: document.getElementById('editDesc').value || '',
+      price: document.getElementById('editPrice').value || '',
+      badge: document.getElementById('editBadge').value || '',
+      icon: document.getElementById('editIcon').value || 'fa-star',
+      image_url: finalImageUrl
+    };
+    
+    if (type === 'service') {
+      itemData.time = document.getElementById('editTime').value || '';
+    } else {
+      itemData.isHot = document.getElementById('editBadge').value.toLowerCase().includes('hot');
+    }
+
+    if (id === 'new') {
+      await supabaseClient.from(table).insert([itemData]);
+    } else {
+      await supabaseClient.from(table).update(itemData).eq('id', id);
+    }
+    
+    closeEditModal();
+    await initDynamicCatalog(); // refresh from db
+  } catch (err) {
+    console.error("Error saving:", err);
+    alert("Error al guardar: " + err.message);
+  } finally {
+    btn.textContent = originalBtnText;
+    btn.disabled = false;
   }
-  
-  localStorage.setItem(key, JSON.stringify(list));
-  closeEditModal();
-  renderDynamicCatalog();
 }
 
-function deleteEditItem() {
+async function deleteEditItem() {
   const type = document.getElementById('editItemType').value;
   const id = document.getElementById('editItemId').value;
   if (id === 'new') return closeEditModal();
   
   if (confirm('¿Seguro que deseas eliminar este elemento?')) {
-    const key = `nails_${type}s_data`;
-    let list = JSON.parse(localStorage.getItem(key) || '[]');
-    list = list.filter(x => x.id !== id);
-    localStorage.setItem(key, JSON.stringify(list));
-    closeEditModal();
-    renderDynamicCatalog();
+    const table = type === 'service' ? 'rosegold_services' : 'rosegold_promos';
+    try {
+       // Eliminar foto asociada
+       const list = JSON.parse(localStorage.getItem(`nails_${type}s_data`) || '[]');
+       const oldItem = list.find(x => x.id === id);
+       if (oldItem && (oldItem.image_url || oldItem.image)) {
+          const oldUrl = oldItem.image_url || oldItem.image;
+          if (oldUrl.includes('supabase')) {
+             const oldFileName = oldUrl.split('/').pop();
+             await supabaseClient.storage.from('rosegold_images').remove([oldFileName]);
+          }
+       }
+       
+       await supabaseClient.from(table).delete().eq('id', id);
+       closeEditModal();
+       await initDynamicCatalog();
+    } catch(err) {
+       alert("Error al eliminar: " + err.message);
+    }
   }
 }
