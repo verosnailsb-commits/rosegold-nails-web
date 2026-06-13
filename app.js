@@ -46,15 +46,39 @@ function bookSlot(dateStr, timeStr, clientName, service, clientPhone, staff) {
   localStorage.setItem(key, JSON.stringify(reservations));
 }
 
+// Helper para leer el horario del día
+function parseTimeRange(timeStr) {
+  if (!timeStr || timeStr.toLowerCase().includes('cerrado')) return null;
+  const parts = timeStr.split(/[-–]/).map(s => s.trim());
+  if (parts.length !== 2) return null;
+  const open = parts[0].split(':').map(Number);
+  const close = parts[1].split(':').map(Number);
+  if (open.length !== 2 || close.length !== 2 || isNaN(open[0]) || isNaN(close[0])) return null;
+  return { openHour: open[0], openMin: open[1], closeHour: close[0], closeMin: close[1] };
+}
+
+function getDaySchedule(dayOfWeek) {
+  const map = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
+  const dayStr = map[dayOfWeek];
+  const set = window.globalSettings || getDefaultSettings();
+  const timeStr = set.scheduleMap[dayStr];
+  return parseTimeRange(timeStr);
+}
+
 // Generar slots del día
-function generateSlots(dateStr, closeHour, closeMin = 30) {
+function generateSlots(sched) {
   const slots = [];
+  if (!sched) return slots;
   
-  for (let h = BUSINESS_HOURS.open; h <= closeHour; h++) {
-    for (let m = 0; m < 60; m += SLOT_INTERVAL) {
-      if (h === closeHour && m > closeMin) break;
-      const timeStr = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
-      slots.push(timeStr);
+  let h = sched.openHour;
+  let m = sched.openMin;
+  
+  while (h < sched.closeHour || (h === sched.closeHour && m <= sched.closeMin)) {
+    slots.push(`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`);
+    m += SLOT_INTERVAL;
+    if (m >= 60) {
+      h++;
+      m -= 60;
     }
   }
   return slots;
@@ -67,13 +91,14 @@ function fillTimeSlots(dateStr) {
   
   const d = new Date(dateStr + 'T00:00:00');
   const dayOfWeek = d.getDay(); // 0=Dom, 6=Sab
-  if (dayOfWeek === 0) {
-    select.innerHTML = '<option value="">❌ Domingo - Cerrado</option>';
+  
+  const sched = getDaySchedule(dayOfWeek);
+  if (!sched) {
+    select.innerHTML = '<option value="">❌ Cerrado</option>';
     return;
   }
-  const closeHour = dayOfWeek === 6 ? 18 : 19;
-  const closeMin = dayOfWeek === 6 ? 0 : 30;
-  const slots = generateSlots(dateStr, closeHour, closeMin);
+  
+  const slots = generateSlots(sched);
   const booked = getBookedSlots(dateStr);
   const reservations = getReservations(dateStr);
   
@@ -121,14 +146,13 @@ function renderSlotsForDate(dateStr) {
     titleSpan.textContent = dayNames[dayOfWeek];
   }
 
-  if (dayOfWeek === 0) {
-    grid.innerHTML = '<p style="color:#ef4444;font-size:14px;grid-column:1/-1;text-align:center;">El salón está cerrado los domingos 🚫</p>';
+  const sched = getDaySchedule(dayOfWeek);
+  if (!sched) {
+    grid.innerHTML = '<p style="color:#ef4444;font-size:14px;grid-column:1/-1;text-align:center;">El salón está cerrado este día 🚫</p>';
     return;
   }
   
-  const closeHour = dayOfWeek === 6 ? 18 : 19;
-  const closeMin = dayOfWeek === 6 ? 0 : 30;
-  const slots = generateSlots(dateStr, closeHour, closeMin);
+  const slots = generateSlots(sched);
   const booked = getBookedSlots(dateStr);
   const reservations = getReservations(dateStr);
   
