@@ -19,6 +19,7 @@
     <ul class="nav-links">
       <li><a href="#servicios">Servicios</a></li>
       <li><a href="#promos">Promos</a></li>
+      <li><a href="#personal">Personal</a></li>
       <li><a href="#turnos">Turnos</a></li>
       <li><a href="#contacto">Contacto</a></li>
     </ul>
@@ -31,6 +32,7 @@
   <div class="mobile-menu" id="mobileMenu">
     <a href="#servicios" onclick="toggleMenu()">Servicios</a>
     <a href="#promos" onclick="toggleMenu()">Promos</a>
+    <a href="#personal" onclick="toggleMenu()">Personal</a>
     <a href="#turnos" onclick="toggleMenu()">Turnos</a>
     <a href="#contacto" onclick="toggleMenu()">Contacto</a>
   </div>
@@ -133,6 +135,21 @@
   </div>
   <div class="promos-grid" id="promosGridContainer">
     <!-- Rendered via JS -->
+  </div>
+</section>
+
+<!-- PERSONAL / STAFF -->
+<section id="personal" class="section">
+  <div class="section-header">
+    <p class="section-tag">Nuestro Equipo</p>
+    <h2>Profesionales a <span class="rose">tu Servicio</span></h2>
+    <p class="section-desc">Hacé clic en "Trabajos" para ver la galería de diseños y servicios realizados por cada manicurista.</p>
+  </div>
+  <div style="display:flex; justify-content:center; margin-bottom: 20px;">
+    <button id="addStaffBtn" class="btn-rose" style="display:none; padding:8px 16px; font-size:12px; margin-bottom:20px;" onclick="openEditModal('staff', 'new')"><i class="fas fa-plus"></i> AGREGAR NUEVO PERSONAL</button>
+  </div>
+  <div class="services-grid" id="staffGridContainer">
+    <!-- Rendered dynamically via JS -->
   </div>
 </section>
 
@@ -261,12 +278,17 @@
     
     <!-- Image Upload Area -->
     <div style="margin-bottom: 20px; text-align: center;">
-      <div id="imagePreview" style="width:100%; height:350px; background:var(--dark4); border-radius:12px; margin-bottom:10px; border:2px dashed rgba(255,255,255,0.2); display:flex; align-items:center; justify-content:center; overflow:hidden; position:relative; cursor:pointer;" onclick="document.getElementById('editImageInput').click()">
+      <div id="imagePreview" style="width:100%; max-width:480px; aspect-ratio:8 / 5; margin:0 auto 10px auto; background:var(--dark4); border-radius:12px; border:2px dashed rgba(255,255,255,0.2); display:flex; align-items:center; justify-content:center; overflow:hidden; position:relative; cursor:pointer;" onclick="document.getElementById('editImageInput').click()">
         <span id="imagePreviewPlaceholder" style="color:var(--gray);"><i class="fas fa-camera fa-2x"></i><br><br>Subir Foto (Click)</span>
         <img id="imagePreviewImg" style="display:none; width:100%; height:100%; object-fit:cover;">
       </div>
       <input type="file" id="editImageInput" accept="image/*" style="display:none;" onchange="handleImageUpload(event)">
-      <button class="btn-outline" style="font-size:11px; padding:4px 10px;" onclick="document.getElementById('editImageInput').value=''; document.getElementById('imagePreviewImg').src=''; document.getElementById('imagePreviewImg').style.display='none'; document.getElementById('imagePreviewPlaceholder').style.display='block';">Quitar Foto</button>
+      <button class="btn-outline" style="font-size:11px; padding:4px 10px;" onclick="document.getElementById('editImageInput').value=''; document.getElementById('imagePreviewImg').src=''; document.getElementById('imagePreviewImg').style.display='none'; document.getElementById('imagePreviewImg').style.transform='scale(1)'; document.getElementById('imageZoom').value='1'; document.getElementById('zoomControl').style.display='none'; document.getElementById('imagePreviewPlaceholder').style.display='block';">Quitar Foto</button>
+      <div id="zoomControl" style="display:none; margin-top: 15px; align-items: center; justify-content: center; gap: 10px;">
+        <i class="fas fa-search-minus" style="color:var(--gray); font-size: 12px;"></i>
+        <input type="range" id="imageZoom" min="1" max="3" step="0.1" value="1" style="width: 150px; accent-color: var(--rose);" oninput="document.getElementById('imagePreviewImg').style.transform = 'scale(' + this.value + ')'">
+        <i class="fas fa-search-plus" style="color:var(--gray); font-size: 12px;"></i>
+      </div>
       <p style="font-size: 11px; color: var(--gray); margin-top: 12px; margin-bottom: 0;"><i class="fas fa-info-circle" style="margin-right: 4px;"></i>Tamaño recomendado: <strong>800 x 500 píxeles</strong> (Formato Horizontal)</p>
     </div>
     
@@ -413,6 +435,47 @@
     <div style="display:flex; gap:10px; margin-top:20px;">
       <button class="btn-rose full" style="flex:2;" id="saveSettingsBtn" onclick="saveSettings()">Guardar Cambios</button>
       <button class="btn-outline" style="flex:1;" onclick="closeSettingsModal()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL ÁLBUM DE TRABAJOS (PORTFOLIO) -->
+<div class="login-overlay" id="portfolioModal" style="display:none; align-items:flex-start; padding-top: 50px; overflow-y:auto; z-index: 3000;">
+  <div class="login-card" style="margin: 0 auto; max-width: 800px; width: 90%; padding: 30px; position: relative;">
+    <span onclick="closePortfolioModal()" style="position: absolute; right: 20px; top: 20px; color: var(--gray); cursor: pointer; font-size: 20px;" title="Cerrar"><i class="fas fa-times"></i></span>
+    <h2 id="portfolioModalTitle" style="color:var(--rose); margin-bottom: 8px; font-family:'Playfair Display', serif;">Trabajos Realizados</h2>
+    <p id="portfolioModalSub" style="color:var(--gray); font-size: 14px; margin-bottom: 24px;">Hacé clic en cualquier foto para agendar un turno con este servicio y manicurista.</p>
+    
+    <!-- Admin Controls to Add New Work to this staff -->
+    <div id="portfolioAdminArea" style="display:none; margin-bottom: 24px; padding: 16px; background:rgba(255,255,255,0.02); border: 1px dashed rgba(255,255,255,0.1); border-radius:12px; text-align: left;">
+      <h4 style="color:white; margin-bottom:12px; font-size:14px;"><i class="fas fa-plus rose"></i> Subir Nuevo Trabajo a este Álbum</h4>
+      
+      <!-- Work Image Upload Area -->
+      <div style="margin-bottom: 15px; text-align: center;">
+        <div id="workImagePreview" style="width:100%; max-width:320px; aspect-ratio:8 / 5; margin:0 auto 10px auto; background:var(--dark4); border-radius:8px; border:1px dashed rgba(255,255,255,0.2); display:flex; align-items:center; justify-content:center; overflow:hidden; position:relative; cursor:pointer;" onclick="document.getElementById('workImageInput').click()">
+          <span id="workImagePreviewPlaceholder" style="color:var(--gray); font-size:12px;"><i class="fas fa-camera fa-lg"></i><br><br>Subir Foto del Trabajo</span>
+          <img id="workImagePreviewImg" style="display:none; width:100%; height:100%; object-fit:cover;">
+        </div>
+        <input type="file" id="workImageInput" accept="image/*" style="display:none;" onchange="handleWorkImageUpload(event)">
+        <button class="btn-outline" style="font-size:10px; padding:2px 8px;" onclick="document.getElementById('workImageInput').value=''; document.getElementById('workImagePreviewImg').src=''; document.getElementById('workImagePreviewImg').style.display='none'; document.getElementById('workImagePreviewPlaceholder').style.display='block';">Quitar Foto</button>
+      </div>
+
+      <div class="login-group">
+        <label style="font-size:10px;">Título del Trabajo / Servicio Realizado</label>
+        <input type="text" id="workTitle" placeholder="Ej: Esculpidas Acrílicas con Deco" style="padding: 10px;">
+      </div>
+      <div class="login-group">
+        <label style="font-size:10px;">Asociar a un Servicio del Catálogo (Para reservas automáticas)</label>
+        <select id="workServiceSelect" style="width:100%; background:var(--dark4); border:1px solid rgba(255,255,255,0.1); color:white; padding:10px; border-radius:8px; outline:none; font-size:14px;">
+          <option value="">-- Seleccionar Servicio --</option>
+        </select>
+      </div>
+      <button class="btn-rose full" style="padding: 10px;" id="btnUploadWork" onclick="saveNewWork()"><i class="fas fa-cloud-upload-alt"></i> Subir Trabajo</button>
+    </div>
+
+    <!-- Works Grid -->
+    <div id="portfolioGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; margin-top: 10px;">
+      <!-- Dynamic works rendered here -->
     </div>
   </div>
 </div>

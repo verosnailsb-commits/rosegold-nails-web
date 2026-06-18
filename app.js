@@ -1,6 +1,17 @@
+function generateUUID() {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
 const WA_NUMBER = '595983996807';
 const BUSINESS_HOURS = { open: 9, close: 19 }; // 9:00 a 19:30
 const SLOT_INTERVAL = 30; // minutos
+
 
 // Turnos ocupados (simulados + localStorage)
 function getBookedSlots(dateStr) {
@@ -310,35 +321,7 @@ window.addEventListener('DOMContentLoaded', () => {
     observer.observe(el);
   });
 
-  // Poblar staff dinámicamente
-  let storedConfig = localStorage.getItem('nails_staff_config');
-  let staffConfig = [];
-  if (!storedConfig) {
-    staffConfig.push({ id: Date.now().toString(), name: 'Valeria', role: 'Especialista Acrílico', commission: 50 });
-    staffConfig.push({ id: (Date.now()+1).toString(), name: 'Sofía', role: 'Especialista Pedicura', commission: 40 });
-    localStorage.setItem('nails_staff_config', JSON.stringify(staffConfig));
-  } else {
-    staffConfig = JSON.parse(storedConfig);
-  }
-  
-  const staffGroup = document.getElementById('staffGroup');
-  const staffSelect = document.getElementById('staffSelect');
-  
-  if (staffConfig.length === 0) {
-    if (staffGroup) staffGroup.style.display = 'none';
-  } else {
-    if (staffGroup) staffGroup.style.display = 'block';
-    if (staffSelect) {
-      staffConfig.forEach(staff => {
-        const opt = document.createElement('option');
-        opt.value = staff.name;
-        opt.textContent = `${staff.name} (${staff.role})`;
-        staffSelect.appendChild(opt);
-      });
-    }
-  }
-
-  // Cargar Catálogo Dinámico (Servicios y Promos)
+  // Poblar staff dinámicamente será manejado por renderDynamicCatalog()
   initDynamicCatalog();
 
 });
@@ -442,23 +425,84 @@ async function initDynamicCatalog() {
   }
 }
 
+function populateStaffSelect(staffConfig) {
+  const staffGroup = document.getElementById('staffGroup');
+  const staffSelect = document.getElementById('staffSelect');
+  if (staffSelect) {
+    staffSelect.innerHTML = '<option value="Cualquiera">Cualquiera (Turno más rápido)</option>';
+    if (staffConfig.length === 0) {
+      if (staffGroup) staffGroup.style.display = 'none';
+    } else {
+      if (staffGroup) staffGroup.style.display = 'block';
+      staffConfig.forEach(staff => {
+        const opt = document.createElement('option');
+        opt.value = staff.name;
+        opt.textContent = `${staff.name} (${staff.role})`;
+        staffSelect.appendChild(opt);
+      });
+    }
+  }
+}
+
 async function renderDynamicCatalog() {
   const isEditMode = localStorage.getItem('nails_edit_mode') === 'true';
   
   // Fetch from Supabase
-  let services = [];
+  let allServices = [];
   let promos = [];
+  let services = [];
+  let staff = [];
+  let portfolio = [];
+  
   try {
     const { data: sData } = await supabaseClient.from('rosegold_services').select('*').order('created_at', { ascending: true });
-    if (sData) services = sData;
+    if (sData) allServices = sData;
     
     const { data: pData } = await supabaseClient.from('rosegold_promos').select('*').order('created_at', { ascending: true });
     if (pData) promos = pData;
     
+    // Separar configuraciones, servicios, staff y trabajos del álbum
+    services = allServices.filter(s => s.id !== 'settings_global' && s.id !== 'settings_hero' && s.badge !== 'staff' && s.desc !== 'Portfolio Work');
+    staff = allServices.filter(s => s.badge === 'staff');
+    portfolio = allServices.filter(s => s.desc === 'Portfolio Work');
+    
+    // Sembrar staff si no hay
+    if (staff.length === 0) {
+      const defaultStaff = [
+        { id: generateUUID(), title: 'Valeria', desc: 'Especialista Acrílico', price: '50', icon: 'fa-user-nurse', badge: 'staff', image: 'logo_veros.png' },
+        { id: generateUUID(), title: 'Sofía', desc: 'Especialista Pedicura', price: '40', icon: 'fa-user-nurse', badge: 'staff', image: 'logo_veros.png' }
+      ];
+      for (const s of defaultStaff) {
+        await supabaseClient.from('rosegold_services').insert([s]);
+      }
+      // Re-fetch
+      const { data: refetchSData } = await supabaseClient.from('rosegold_services').select('*').order('created_at', { ascending: true });
+      if (refetchSData) {
+        allServices = refetchSData;
+        services = allServices.filter(s => s.id !== 'settings_global' && s.id !== 'settings_hero' && s.badge !== 'staff' && s.desc !== 'Portfolio Work');
+        staff = allServices.filter(s => s.badge === 'staff');
+        portfolio = allServices.filter(s => s.desc === 'Portfolio Work');
+      }
+    }
+    
+    window.allCatalogItems = allServices;
+    window.currentPortfolioData = portfolio;
+    window.currentServicesData = services;
+    
+    // Guardar para uso local (coincidir con admin.html)
+    const staffConfig = staff.map(s => ({
+      id: s.id,
+      name: s.title,
+      role: s.desc,
+      commission: parseFloat(s.price) || 50,
+      image: s.image
+    }));
+    localStorage.setItem('nails_staff_config', JSON.stringify(staffConfig));
+    localStorage.setItem('nails_portfolio_data', JSON.stringify(portfolio));
+    
     // Extract global settings
-    const settingsObj = services.find(s => s.id === 'settings_global');
+    const settingsObj = allServices.find(s => s.id === 'settings_global');
     if (settingsObj) {
-      services = services.filter(s => s.id !== 'settings_global');
       try {
         window.globalSettings = JSON.parse(settingsObj.title);
         applyGlobalSettings(window.globalSettings);
@@ -469,9 +513,8 @@ async function renderDynamicCatalog() {
     }
     
     // Extract hero settings
-    const heroSettingsObj = services.find(s => s.id === 'settings_hero');
+    const heroSettingsObj = allServices.find(s => s.id === 'settings_hero');
     if (heroSettingsObj) {
-      services = services.filter(s => s.id !== 'settings_hero');
       try {
         window.heroSettings = JSON.parse(heroSettingsObj.title);
         applyHeroSettings(window.heroSettings);
@@ -484,6 +527,7 @@ async function renderDynamicCatalog() {
     localStorage.setItem('nails_services_data', JSON.stringify(services));
     localStorage.setItem('nails_promos_data', JSON.stringify(promos));
   } catch (e) {
+    console.error("Error loading Supabase catalog, loading local fallback", e);
     return renderDynamicCatalogLocal();
   }
   
@@ -493,13 +537,15 @@ async function renderDynamicCatalog() {
   const editHeroBtn = document.getElementById('editHeroBtn');
   if (editHeroBtn) editHeroBtn.style.display = isEditMode ? 'inline-block' : 'none';
   
-  // Helper para manejar image vs image
+  const addStaffBtn = document.getElementById('addStaffBtn');
+  if (addStaffBtn) addStaffBtn.style.display = isEditMode ? 'inline-block' : 'none';
+  
   // Render Services
   const sContainer = document.getElementById('servicesGridContainer');
   if (sContainer) {
     sContainer.innerHTML = '';
     services.forEach(item => {
-      const imgPath = item.image || item.image;
+      const imgPath = item.image;
       const imgHtml = imgPath ? `<img src="${imgPath}" class="service-image" alt="${item.title}">` : `<div class="service-icon"><i class="fas ${item.icon}"></i></div>`;
       const badgeHtml = item.badge ? `<div class="badge">${item.badge}</div>` : '';
       const editBtn = isEditMode ? `
@@ -538,7 +584,7 @@ async function renderDynamicCatalog() {
   if (pContainer) {
     pContainer.innerHTML = '';
     promos.forEach(item => {
-      const imgPath = item.image || item.image;
+      const imgPath = item.image;
       const imgHtml = imgPath ? `<img src="${imgPath}" class="promo-image" alt="${item.title}">` : `<div class="promo-icon"><i class="fas ${item.icon}"></i></div>`;
       const badgeClass = item.isHot ? 'promo-badge hot' : 'promo-badge';
       const badgeHtml = item.badge ? `<div class="${badgeClass}">${item.badge}</div>` : '';
@@ -572,6 +618,41 @@ async function renderDynamicCatalog() {
       `;
     }
   }
+
+  // Render Staff
+  const staffContainer = document.getElementById('staffGridContainer');
+  if (staffContainer) {
+    staffContainer.innerHTML = '';
+    staff.forEach(item => {
+      const imgPath = item.image || 'logo_veros.png';
+      const imgHtml = `<img src="${imgPath}" class="service-image" alt="${item.title}" style="height: 280px; object-fit: cover;">`;
+      const editBtn = isEditMode ? `
+        <button class="edit-overlay-btn" onclick="openEditModal('staff', '${item.id}')"><i class="fas fa-pencil-alt"></i> EDITAR</button>
+        <button class="edit-overlay-btn" style="left:10px; right:auto; background:rgba(239, 68, 68, 0.9);" onclick="deleteItemDirectly('staff', '${item.id}', event)"><i class="fas fa-trash"></i></button>
+      ` : '';
+      
+      staffContainer.innerHTML += `
+        <div class="service-card" style="padding: 0; display: flex; flex-direction: column; height: 100%;">
+          ${editBtn}
+          ${imgHtml}
+          <h3 style="margin-top: 20px; font-family:'Playfair Display', serif; font-size: 22px; font-weight:700; text-align: center;">${item.title}</h3>
+          <p style="color:var(--gray); font-size: 14px; margin-bottom: 20px; text-align: center; padding: 0 16px;">${item.desc}</p>
+          <div style="padding: 0 24px 24px 24px; margin-top: auto; display: flex; gap: 10px; justify-content: center;">
+            <button class="btn-rose small full" onclick="openPortfolio('${item.id}', '${item.title}')"><i class="fas fa-images"></i> Trabajos</button>
+          </div>
+        </div>
+      `;
+    });
+    
+    if (isEditMode) {
+      staffContainer.innerHTML += `
+        <div class="add-new-card" onclick="openEditModal('staff', 'new')">
+          <i class="fas fa-plus-circle"></i>
+          <span>Agregar Personal</span>
+        </div>
+      `;
+    }
+  }
   
   // Populate Service Select Dropdown
   const select = document.getElementById('serviceSelect');
@@ -592,14 +673,117 @@ async function renderDynamicCatalog() {
       select.appendChild(opt);
     });
   }
+
+  // Populate Staff dropdown in booking form
+  const staffConfig = staff.map(s => ({ id: s.id, name: s.title, role: s.desc, commission: parseFloat(s.price) || 50 }));
+  populateStaffSelect(staffConfig);
 }
 
 function renderDynamicCatalogLocal() {
   const isEditMode = localStorage.getItem('nails_edit_mode') === 'true';
   const services = JSON.parse(localStorage.getItem('nails_services_data') || '[]');
   const promos = JSON.parse(localStorage.getItem('nails_promos_data') || '[]');
+  const staffConfig = JSON.parse(localStorage.getItem('nails_staff_config') || '[]');
   
-  // (Rest of the original code, but we already handled the variables above, so we don't strictly need a duplicate function if we just let the logic flow. Let's keep it simple).
+  window.currentServicesData = services;
+  window.currentPortfolioData = JSON.parse(localStorage.getItem('nails_portfolio_data') || '[]');
+  
+  // Render services
+  const sContainer = document.getElementById('servicesGridContainer');
+  if (sContainer) {
+    sContainer.innerHTML = '';
+    services.forEach(item => {
+      const imgPath = item.image;
+      const imgHtml = imgPath ? `<img src="${imgPath}" class="service-image" alt="${item.title}">` : `<div class="service-icon"><i class="fas ${item.icon}"></i></div>`;
+      const badgeHtml = item.badge ? `<div class="badge">${item.badge}</div>` : '';
+      const editBtn = isEditMode ? `
+        <button class="edit-overlay-btn" onclick="openEditModal('service', '${item.id}')"><i class="fas fa-pencil-alt"></i> EDITAR</button>
+      ` : '';
+      const valForSelect = `${item.title} (${item.time || 'Promo'})`;
+      sContainer.innerHTML += `
+        <div class="service-card ${item.badge ? 'featured' : ''}">
+          ${editBtn}
+          ${badgeHtml}
+          ${imgHtml}
+          <h3>${item.title}</h3>
+          <p>${item.desc}</p>
+          <div class="service-price"><span class="rose">${item.price}</span></div>
+          ${item.time ? `<div class="service-time"><i class="far fa-clock"></i> ${item.time}</div>` : ''}
+          <button class="btn-rose small" onclick="selectService('${valForSelect}')">Reservar</button>
+        </div>
+      `;
+    });
+  }
+
+  // Render Promos
+  const pContainer = document.getElementById('promosGridContainer');
+  if (pContainer) {
+    pContainer.innerHTML = '';
+    promos.forEach(item => {
+      const imgPath = item.image;
+      const imgHtml = imgPath ? `<img src="${imgPath}" class="promo-image" alt="${item.title}">` : `<div class="promo-icon"><i class="fas ${item.icon}"></i></div>`;
+      const badgeClass = item.isHot ? 'promo-badge hot' : 'promo-badge';
+      const badgeHtml = item.badge ? `<div class="${badgeClass}">${item.badge}</div>` : '';
+      const editBtn = isEditMode ? `
+        <button class="edit-overlay-btn" onclick="openEditModal('promo', '${item.id}')"><i class="fas fa-pencil-alt"></i> EDITAR</button>
+      ` : '';
+      const cardClass = item.isHot ? 'promo-card rose-card' : 'promo-card';
+      const valForSelect = `Promo: ${item.title}`;
+      pContainer.innerHTML += `
+        <div class="${cardClass}">
+          ${editBtn}
+          ${badgeHtml}
+          ${imgHtml}
+          <h3>${item.title}</h3>
+          <p>${item.desc}</p>
+          <div class="promo-price">${item.price}</div>
+          <button class="btn-rose small" onclick="selectService('${valForSelect}')">Aprovechar</button>
+        </div>
+      `;
+    });
+  }
+
+  // Render Staff
+  const staffContainer = document.getElementById('staffGridContainer');
+  if (staffContainer) {
+    staffContainer.innerHTML = '';
+    staffConfig.forEach(item => {
+      const imgPath = item.image || 'logo_veros.png';
+      const imgHtml = `<img src="${imgPath}" class="service-image" alt="${item.name}" style="height: 280px; object-fit: cover;">`;
+      staffContainer.innerHTML += `
+        <div class="service-card" style="padding: 0; display: flex; flex-direction: column; height: 100%;">
+          ${imgHtml}
+          <h3 style="margin-top: 20px; font-family:'Playfair Display', serif; font-size: 22px; font-weight:700; text-align: center;">${item.name}</h3>
+          <p style="color:var(--gray); font-size: 14px; margin-bottom: 20px; text-align: center; padding: 0 16px;">${item.role}</p>
+          <div style="padding: 0 24px 24px 24px; margin-top: auto; display: flex; gap: 10px; justify-content: center;">
+            <button class="btn-rose small full" onclick="openPortfolio('${item.id}', '${item.name}')"><i class="fas fa-images"></i> Trabajos</button>
+          </div>
+        </div>
+      `;
+    });
+  }
+
+  // Populate Service Select
+  const select = document.getElementById('serviceSelect');
+  if (select) {
+    select.innerHTML = '<option value="">-- Seleccionar --</option>';
+    services.forEach(item => {
+      const val = `${item.title} (${item.time || 'Promo'})`;
+      const opt = document.createElement('option');
+      opt.value = val;
+      opt.textContent = `${item.title} - ${item.price}`;
+      select.appendChild(opt);
+    });
+    promos.forEach(item => {
+      const val = `Promo: ${item.title}`;
+      const opt = document.createElement('option');
+      opt.value = val;
+      opt.textContent = `${val} - ${item.price}`;
+      select.appendChild(opt);
+    });
+  }
+
+  populateStaffSelect(staffConfig);
 }
 
 // ================= MODAL DE EDICIÓN =================
@@ -607,12 +791,36 @@ function openEditModal(type, id) {
   const modal = document.getElementById('editModal');
   if (!modal) return;
   
+  window.currentUploadedImage = null;
+  
   document.getElementById('editItemType').value = type;
   document.getElementById('editItemId').value = id;
   
   const titleEl = document.getElementById('editModalTitle');
-  titleEl.textContent = id === 'new' ? (type === 'service' ? 'Nuevo Servicio' : 'Nueva Promo') : 'Editar Elemento';
+  titleEl.textContent = id === 'new' ? (type === 'service' ? 'Nuevo Servicio' : (type === 'promo' ? 'Nueva Promo' : 'Nueva Manicurista')) : 'Editar Elemento';
   
+  const titleGroup = document.getElementById('editTitle').closest('.login-group');
+  const descGroup = document.getElementById('editDesc').closest('.login-group');
+  const priceGroup = document.getElementById('editPrice').closest('.login-group');
+  const timeGroup = document.getElementById('editTime').closest('.login-group');
+  const extrasGroup = document.getElementById('editBadge').closest('.login-group');
+  
+  if (type === 'staff') {
+    titleGroup.querySelector('label').innerHTML = 'Nombre';
+    descGroup.querySelector('label').innerHTML = 'Especialidad / Cargo';
+    priceGroup.querySelector('label').innerHTML = 'Comisión (%)';
+    document.getElementById('editPrice').placeholder = 'Ej: 50';
+    if (timeGroup) timeGroup.style.display = 'none';
+    if (extrasGroup) extrasGroup.style.display = 'none';
+  } else {
+    titleGroup.querySelector('label').innerHTML = 'Título';
+    descGroup.querySelector('label').innerHTML = 'Descripción';
+    priceGroup.querySelector('label').innerHTML = 'Precio / Oferta (Texto libre)';
+    document.getElementById('editPrice').placeholder = 'Ej: Gs. 50.000 / ¡20% OFF!';
+    if (timeGroup) timeGroup.style.display = 'block';
+    if (extrasGroup) extrasGroup.style.display = 'flex';
+  }
+
   // Limpiar campos
   document.getElementById('editTitle').value = '';
   document.getElementById('editDesc').value = '';
@@ -622,12 +830,21 @@ function openEditModal(type, id) {
   document.getElementById('editIcon').value = 'fa-star';
   document.getElementById('imagePreviewImg').style.display = 'none';
   document.getElementById('imagePreviewImg').src = '';
+  document.getElementById('imagePreviewImg').style.transform = 'scale(1)';
+  if(document.getElementById('imageZoom')) document.getElementById('imageZoom').value = '1';
+  if(document.getElementById('zoomControl')) document.getElementById('zoomControl').style.display = 'none';
   document.getElementById('imagePreviewPlaceholder').style.display = 'block';
   document.getElementById('editImageInput').value = '';
   
   if (id !== 'new') {
-    const list = JSON.parse(localStorage.getItem(`nails_${type}s_data`) || '[]');
-    const item = list.find(x => x.id === id);
+    let item = null;
+    if (window.allCatalogItems) {
+      item = window.allCatalogItems.find(x => x.id === id);
+    }
+    if (!item) {
+      const list = JSON.parse(localStorage.getItem(type === 'promo' ? 'nails_promos_data' : 'nails_services_data') || '[]');
+      item = list.find(x => x.id === id);
+    }
     if (item) {
       document.getElementById('editTitle').value = item.title || '';
       document.getElementById('editDesc').value = item.desc || '';
@@ -636,11 +853,20 @@ function openEditModal(type, id) {
       document.getElementById('editBadge').value = item.badge || '';
       document.getElementById('editIcon').value = item.icon || 'fa-star';
       
-      const imgPath = item.image || item.image;
+      const imgPath = item.image;
       if (imgPath) {
         document.getElementById('imagePreviewImg').src = imgPath;
         document.getElementById('imagePreviewImg').style.display = 'block';
         document.getElementById('imagePreviewPlaceholder').style.display = 'none';
+        if(document.getElementById('zoomControl')) document.getElementById('zoomControl').style.display = 'flex';
+        
+        // Load image so we can zoom/crop it
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.onload = function() {
+          window.currentUploadedImage = img;
+        };
+        img.src = imgPath;
       }
     }
   }
@@ -660,9 +886,10 @@ function handleImageUpload(e) {
   reader.onload = function(event) {
     const img = new Image();
     img.onload = function() {
-      // Comprimir a max 600px
+      window.currentUploadedImage = img;
+      // Comprimir a max 800px
       const canvas = document.createElement('canvas');
-      const MAX_WIDTH = 600;
+      const MAX_WIDTH = 800;
       let width = img.width;
       let height = img.height;
       if (width > MAX_WIDTH) {
@@ -677,7 +904,10 @@ function handleImageUpload(e) {
       
       document.getElementById('imagePreviewImg').src = dataUrl;
       document.getElementById('imagePreviewImg').style.display = 'block';
+      document.getElementById('imagePreviewImg').style.transform = 'scale(1)';
+      if(document.getElementById('imageZoom')) document.getElementById('imageZoom').value = '1';
       document.getElementById('imagePreviewPlaceholder').style.display = 'none';
+      if(document.getElementById('zoomControl')) document.getElementById('zoomControl').style.display = 'flex';
     };
     img.src = event.target.result;
   };
@@ -697,11 +927,14 @@ function dataURLtoBlob(dataurl) {
 async function saveEdit() {
   const type = document.getElementById('editItemType').value;
   const id = document.getElementById('editItemId').value;
-  const table = type === 'service' ? 'rosegold_services' : 'rosegold_promos';
+  const table = type === 'promo' ? 'rosegold_promos' : 'rosegold_services';
   
   const imgSrc = document.getElementById('imagePreviewImg').src;
   const hasImage = document.getElementById('imagePreviewImg').style.display === 'block';
   const isNewImage = hasImage && imgSrc.startsWith('data:image');
+  const zoomVal = parseFloat(document.getElementById('imageZoom')?.value || '1');
+  const isZoomed = zoomVal !== 1;
+  const shouldUpload = isNewImage || (isZoomed && window.currentUploadedImage);
   
   const btn = document.querySelector('#editModal .btn-rose.full');
   const originalBtnText = btn.textContent;
@@ -711,10 +944,38 @@ async function saveEdit() {
   try {
     let finalImageUrl = hasImage ? imgSrc : null;
     
-    // Subir imagen a Supabase si es nueva (Base64)
-    if (isNewImage) {
+    // Subir imagen a Supabase si es nueva (Base64) o si fue zoomeada
+    if (shouldUpload) {
+      let uploadSrc = imgSrc;
+      if (window.currentUploadedImage) {
+        const img = window.currentUploadedImage;
+        
+        const canvas = document.createElement('canvas');
+        canvas.width = 800;
+        canvas.height = 500;
+        const ctx = canvas.getContext('2d');
+        
+        const targetAspect = 8 / 5; // 1.6
+        const imgAspect = img.width / img.height;
+        let cw, ch;
+        if (imgAspect > targetAspect) {
+          // La imagen es más ancha que 8:5
+          ch = img.height / zoomVal;
+          cw = ch * targetAspect;
+        } else {
+          // La imagen es más alta (o igual) que 8:5
+          cw = img.width / zoomVal;
+          ch = cw / targetAspect;
+        }
+        const sx = (img.width - cw) / 2;
+        const sy = (img.height - ch) / 2;
+        
+        ctx.drawImage(img, sx, sy, cw, ch, 0, 0, 800, 500);
+        uploadSrc = canvas.toDataURL('image/jpeg', 0.85);
+      }
+      
       const fileName = `img_${Date.now()}.jpg`;
-      const fileBlob = dataURLtoBlob(imgSrc);
+      const fileBlob = dataURLtoBlob(uploadSrc);
       
       const { data: uploadData, error: uploadError } = await supabaseClient
         .storage
@@ -732,10 +993,16 @@ async function saveEdit() {
       
       // Cleanup de imagen vieja (Opcional, requiere conocer la URL anterior)
       if (id !== 'new') {
-        const list = JSON.parse(localStorage.getItem(`nails_${type}s_data`) || '[]');
-        const oldItem = list.find(x => x.id === id);
-        if (oldItem && (oldItem.image || oldItem.image)) {
-           const oldUrl = oldItem.image || oldItem.image;
+        let oldItem = null;
+        if (window.allCatalogItems) {
+          oldItem = window.allCatalogItems.find(x => x.id === id);
+        }
+        if (!oldItem) {
+          const list = JSON.parse(localStorage.getItem(type === 'promo' ? 'nails_promos_data' : 'nails_services_data') || '[]');
+          oldItem = list.find(x => x.id === id);
+        }
+        if (oldItem && oldItem.image) {
+           const oldUrl = oldItem.image;
            if (oldUrl.includes('supabase')) {
               const oldFileName = oldUrl.split('/').pop();
               await supabaseClient.storage.from('rosegold_images').remove([oldFileName]);
@@ -744,10 +1011,16 @@ async function saveEdit() {
       }
     } else if (!hasImage && id !== 'new') {
        // Si quitaron la imagen, borrar la vieja
-       const list = JSON.parse(localStorage.getItem(`nails_${type}s_data`) || '[]');
-       const oldItem = list.find(x => x.id === id);
-       if (oldItem && (oldItem.image || oldItem.image)) {
-          const oldUrl = oldItem.image || oldItem.image;
+       let oldItem = null;
+       if (window.allCatalogItems) {
+         oldItem = window.allCatalogItems.find(x => x.id === id);
+       }
+       if (!oldItem) {
+         const list = JSON.parse(localStorage.getItem(type === 'promo' ? 'nails_promos_data' : 'nails_services_data') || '[]');
+         oldItem = list.find(x => x.id === id);
+       }
+       if (oldItem && oldItem.image) {
+          const oldUrl = oldItem.image;
           if (oldUrl.includes('supabase')) {
              const oldFileName = oldUrl.split('/').pop();
              await supabaseClient.storage.from('rosegold_images').remove([oldFileName]);
@@ -766,11 +1039,17 @@ async function saveEdit() {
     
     if (type === 'service') {
       itemData.time = document.getElementById('editTime').value || '';
-    } else {
+    } else if (type === 'promo') {
       itemData.isHot = document.getElementById('editBadge').value.toLowerCase().includes('hot');
+    } else if (type === 'staff') {
+      itemData.icon = 'fa-user-nurse'; // standard icon
     }
 
     if (id === 'new') {
+      itemData.id = generateUUID();
+      if (type === 'staff') {
+        itemData.badge = 'staff';
+      }
       await supabaseClient.from(table).insert([itemData]);
     } else {
       await supabaseClient.from(table).update(itemData).eq('id', id);
@@ -793,13 +1072,19 @@ async function deleteEditItem() {
   if (id === 'new') return closeEditModal();
   
   if (confirm('¿Seguro que deseas eliminar este elemento?')) {
-    const table = type === 'service' ? 'rosegold_services' : 'rosegold_promos';
+    const table = type === 'promo' ? 'rosegold_promos' : 'rosegold_services';
     try {
        // Eliminar foto asociada
-       const list = JSON.parse(localStorage.getItem(`nails_${type}s_data`) || '[]');
-       const oldItem = list.find(x => x.id === id);
-       if (oldItem && (oldItem.image_url || oldItem.image)) {
-          const oldUrl = oldItem.image_url || oldItem.image;
+       let oldItem = null;
+       if (window.allCatalogItems) {
+         oldItem = window.allCatalogItems.find(x => x.id === id);
+       }
+       if (!oldItem) {
+         const list = JSON.parse(localStorage.getItem(type === 'promo' ? 'nails_promos_data' : 'nails_services_data') || '[]');
+         oldItem = list.find(x => x.id === id);
+       }
+       if (oldItem && oldItem.image) {
+          const oldUrl = oldItem.image;
           if (oldUrl.includes('supabase')) {
              const oldFileName = oldUrl.split('/').pop();
              await supabaseClient.storage.from('rosegold_images').remove([oldFileName]);
@@ -942,11 +1227,17 @@ async function deleteItemDirectly(type, id, event) {
   if (!confirm("¿Estás seguro de que deseas eliminar este elemento?")) return;
   
   try {
-    const table = type === 'service' ? 'rosegold_services' : 'rosegold_promos';
+    const table = type === 'promo' ? 'rosegold_promos' : 'rosegold_services';
     
     // Intentar borrar imagen si existe
-    const list = JSON.parse(localStorage.getItem(`nails_${type}s_data`) || '[]');
-    const oldItem = list.find(x => x.id === id);
+    let oldItem = null;
+    if (window.allCatalogItems) {
+      oldItem = window.allCatalogItems.find(x => x.id === id);
+    }
+    if (!oldItem) {
+      const list = JSON.parse(localStorage.getItem(type === 'promo' ? 'nails_promos_data' : 'nails_services_data') || '[]');
+      oldItem = list.find(x => x.id === id);
+    }
     if (oldItem && oldItem.image && oldItem.image.includes('supabase')) {
        const oldFileName = oldItem.image.split('/').pop();
        await supabaseClient.storage.from('rosegold_images').remove([oldFileName]);
@@ -1061,3 +1352,248 @@ window.openHeroModal = openHeroModal;
 window.closeHeroModal = closeHeroModal;
 window.saveHeroSettings = saveHeroSettings;
 window.loadHeroForm = loadHeroForm;
+
+// ================= ÁLBUM DE TRABAJOS (PORTFOLIO) =================
+function openPortfolio(staffId, staffName) {
+  window.currentPortfolioStaffId = staffId;
+  const isEditMode = localStorage.getItem('nails_edit_mode') === 'true';
+  
+  const title = document.getElementById('portfolioModalTitle');
+  if (title) title.textContent = `Trabajos de ${staffName}`;
+  
+  const adminArea = document.getElementById('portfolioAdminArea');
+  if (adminArea) adminArea.style.display = isEditMode ? 'block' : 'none';
+  
+  // Clear inputs
+  document.getElementById('workTitle').value = '';
+  document.getElementById('workImageInput').value = '';
+  document.getElementById('workImagePreviewImg').src = '';
+  document.getElementById('workImagePreviewImg').style.display = 'none';
+  document.getElementById('workImagePreviewPlaceholder').style.display = 'block';
+  window.currentWorkUploadedImage = null;
+  
+  // Fill service select for work mapping
+  const sSelect = document.getElementById('workServiceSelect');
+  if (sSelect) {
+    sSelect.innerHTML = '<option value="">-- Seleccionar Servicio (Opcional) --</option>';
+    const services = window.currentServicesData || [];
+    services.forEach(s => {
+      const opt = document.createElement('option');
+      opt.value = `${s.title} (${s.time || 'Promo'})`;
+      opt.textContent = s.title;
+      sSelect.appendChild(opt);
+    });
+  }
+  
+  renderPortfolioGrid();
+  
+  document.getElementById('portfolioModal').style.display = 'flex';
+}
+
+function closePortfolioModal() {
+  document.getElementById('portfolioModal').style.display = 'none';
+}
+
+function renderPortfolioGrid() {
+  const grid = document.getElementById('portfolioGrid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  
+  const works = (window.currentPortfolioData || []).filter(w => w.badge === window.currentPortfolioStaffId);
+  const isEditMode = localStorage.getItem('nails_edit_mode') === 'true';
+  
+  if (works.length === 0) {
+    grid.innerHTML = `<div style="grid-column: 1/-1; text-align: center; color: var(--gray); padding: 40px 0;">Esta manicurista aún no tiene fotos en su álbum.</div>`;
+    return;
+  }
+  
+  works.forEach(work => {
+    const editBtn = isEditMode ? `
+      <button class="edit-overlay-btn" style="background:rgba(239, 68, 68, 0.9); top:10px; right:10px;" onclick="deleteWork('${work.id}', '${work.image}', event)"><i class="fas fa-trash"></i></button>
+    ` : '';
+    
+    // In client mode, click selects staff & service and scrolls to booking form
+    const clickAction = !isEditMode ? `onclick="selectWorkBooking('${window.currentPortfolioStaffId}', '${work.price}')"` : '';
+    
+    grid.innerHTML += `
+      <div class="promo-card" style="padding: 0; cursor: ${isEditMode ? 'default' : 'pointer'}; overflow: hidden; position: relative;" ${clickAction}>
+        ${editBtn}
+        <img src="${work.image}" style="width: 100%; height: 240px; object-fit: cover; border-bottom: 1px solid rgba(255,255,255,0.05);">
+        <h4 style="margin: 12px; font-size: 14px; text-align: center; color: white;">${work.title}</h4>
+        ${work.price ? `<p style="font-size: 11px; color: var(--rose); margin-bottom: 12px; text-align: center;">${work.price.split(' (')[0]}</p>` : ''}
+      </div>
+    `;
+  });
+}
+
+function handleWorkImageUpload(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  
+  const reader = new FileReader();
+  reader.onload = function(event) {
+    const img = new Image();
+    img.onload = function() {
+      window.currentWorkUploadedImage = img;
+      
+      const canvas = document.createElement('canvas');
+      const MAX_WIDTH = 800;
+      let width = img.width;
+      let height = img.height;
+      if (width > MAX_WIDTH) {
+        height = Math.floor(height * (MAX_WIDTH / width));
+        width = MAX_WIDTH;
+      }
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+      
+      document.getElementById('workImagePreviewImg').src = dataUrl;
+      document.getElementById('workImagePreviewImg').style.display = 'block';
+      document.getElementById('workImagePreviewPlaceholder').style.display = 'none';
+    };
+    img.src = event.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+async function saveNewWork() {
+  if (!window.currentWorkUploadedImage) {
+    return alert('Por favor, selecciona una imagen para el trabajo.');
+  }
+  const title = document.getElementById('workTitle').value.trim() || 'Trabajo realizado';
+  const service = document.getElementById('workServiceSelect').value;
+  
+  const btn = document.getElementById('btnUploadWork');
+  const originalText = btn.innerHTML;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Subiendo...';
+  btn.disabled = true;
+  
+  try {
+    const img = window.currentWorkUploadedImage;
+    
+    // Crop to 800x500
+    const canvas = document.createElement('canvas');
+    canvas.width = 800;
+    canvas.height = 500;
+    const ctx = canvas.getContext('2d');
+    
+    const targetAspect = 8 / 5;
+    const imgAspect = img.width / img.height;
+    let cw, ch;
+    if (imgAspect > targetAspect) {
+      ch = img.height;
+      cw = ch * targetAspect;
+    } else {
+      cw = img.width;
+      ch = cw / targetAspect;
+    }
+    const sx = (img.width - cw) / 2;
+    const sy = (img.height - ch) / 2;
+    
+    ctx.drawImage(img, sx, sy, cw, ch, 0, 0, 800, 500);
+    const uploadSrc = canvas.toDataURL('image/jpeg', 0.85);
+    
+    const fileName = `work_${Date.now()}.jpg`;
+    const fileBlob = dataURLtoBlob(uploadSrc);
+    
+    const { data: uploadData, error: uploadError } = await supabaseClient
+      .storage
+      .from('rosegold_images')
+      .upload(fileName, fileBlob, { contentType: 'image/jpeg' });
+      
+    if (uploadError) throw uploadError;
+    
+    const { data: publicUrlData } = supabaseClient
+      .storage
+      .from('rosegold_images')
+      .getPublicUrl(fileName);
+      
+    const finalImageUrl = publicUrlData.publicUrl;
+    
+    // Guardar en rosegold_services (con id prefix work_)
+    const workData = {
+      id: generateUUID(),
+      title: title,
+      desc: 'Portfolio Work',
+      price: service, // guardar el valor de reserva del servicio
+      badge: window.currentPortfolioStaffId, // guardar el id del personal dueño de este álbum
+      image: finalImageUrl,
+      icon: ''
+    };
+    
+    await supabaseClient.from('rosegold_services').insert([workData]);
+    
+    // Actualizar datos locales y volver a renderizar
+    await initDynamicCatalog();
+    renderPortfolioGrid();
+    
+    // Resetear form de subida
+    document.getElementById('workTitle').value = '';
+    document.getElementById('workImageInput').value = '';
+    document.getElementById('workImagePreviewImg').src = '';
+    document.getElementById('workImagePreviewImg').style.display = 'none';
+    document.getElementById('workImagePreviewPlaceholder').style.display = 'block';
+    window.currentWorkUploadedImage = null;
+    
+  } catch(e) {
+    console.error(e);
+    alert('Error al subir trabajo: ' + e.message);
+  } finally {
+    btn.innerHTML = originalText;
+    btn.disabled = false;
+  }
+}
+
+async function deleteWork(workId, imageUrl, event) {
+  if (event) event.stopPropagation();
+  if (!confirm('¿Seguro que deseas eliminar esta foto del álbum?')) return;
+  
+  try {
+    // Eliminar de Supabase Storage
+    if (imageUrl && imageUrl.includes('supabase')) {
+      const fileName = imageUrl.split('/').pop();
+      await supabaseClient.storage.from('rosegold_images').remove([fileName]);
+    }
+    
+    // Eliminar de la base de datos
+    await supabaseClient.from('rosegold_services').delete().eq('id', workId);
+    
+    // Refrescar
+    await initDynamicCatalog();
+    renderPortfolioGrid();
+  } catch(e) {
+    console.error(e);
+    alert('Error al eliminar trabajo: ' + e.message);
+  }
+}
+
+function selectWorkBooking(staffId, serviceValue) {
+  // Buscar el nombre del staff a partir de staffId
+  const staffObj = window.allCatalogItems ? window.allCatalogItems.find(x => x.id === staffId) : null;
+  if (staffObj) {
+    const staffSelect = document.getElementById('staffSelect');
+    if (staffSelect) staffSelect.value = staffObj.title;
+  }
+  
+  // Seleccionar el servicio
+  if (serviceValue) {
+    const serviceSelect = document.getElementById('serviceSelect');
+    if (serviceSelect) serviceSelect.value = serviceValue;
+  }
+  
+  closePortfolioModal();
+  
+  // Scroll suave al formulario de reserva
+  const turnosSec = document.getElementById('turnos');
+  if (turnosSec) turnosSec.scrollIntoView({ behavior: 'smooth' });
+}
+
+window.openPortfolio = openPortfolio;
+window.closePortfolioModal = closePortfolioModal;
+window.handleWorkImageUpload = handleWorkImageUpload;
+window.saveNewWork = saveNewWork;
+window.deleteWork = deleteWork;
+window.selectWorkBooking = selectWorkBooking;

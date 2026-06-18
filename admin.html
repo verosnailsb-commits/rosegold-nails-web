@@ -280,7 +280,22 @@
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
+  function generateUUID() {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+      return crypto.randomUUID();
+    }
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  }
+
+  const SUPABASE_URL = 'https://oppcyderpkhcnduqexag.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_0sUIqkHzZ8-gfHaoKV9wgw_4xy8hSyT';
+  const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
   function togglePasswordVisibility(inputId, iconId) {
     const input = document.getElementById(inputId);
     const icon = document.getElementById(iconId);
@@ -809,10 +824,29 @@
     document.getElementById('historyFromInput').value = thirtyDaysAgoStr;
     document.getElementById('historyToInput').value = today;
     
-    calculateEarnings();
+    initAdminStaff();
     renderAdminSlots(today);
     loadMaintenanceList();
   });
+
+  async function initAdminStaff() {
+    try {
+      const { data: sData } = await supabaseClient.from('rosegold_services').select('*').order('created_at', { ascending: true });
+      if (sData) {
+        const staff = sData.filter(s => s.badge === 'staff');
+        const config = staff.map(s => ({
+          id: s.id,
+          name: s.title,
+          role: s.desc,
+          commission: parseFloat(s.price) || 50
+        }));
+        localStorage.setItem('nails_staff_config', JSON.stringify(config));
+      }
+    } catch(e) {
+      console.error("Error loading staff from Supabase in admin", e);
+    }
+    calculateEarnings();
+  }
 
   // Función para cargar clientas que necesitan mantenimiento
   function loadMaintenanceList() {
@@ -920,7 +954,7 @@
     });
   }
 
-  function saveStaff(id) {
+  async function saveStaff(id) {
     const name = document.getElementById(`staff_name_${id}`).value.trim();
     const role = document.getElementById(`staff_role_${id}`).value.trim();
     const comm = parseFloat(document.getElementById(`staff_comm_${id}`).value) || 0;
@@ -934,22 +968,70 @@
       config[staffIndex].role = role;
       config[staffIndex].commission = comm;
       localStorage.setItem('nails_staff_config', JSON.stringify(config));
-      alert('Staff actualizado guardado correctamente.\\nNota: Si cambiaste el nombre, es posible que los turnos viejos queden asociados al nombre anterior.');
+      
+      try {
+        const { data: existing } = await supabaseClient.from('rosegold_services').select('image').eq('id', id).limit(1);
+        const currentImage = (existing && existing[0]) ? existing[0].image : 'logo_veros.png';
+        await supabaseClient.from('rosegold_services').upsert({
+          id: id,
+          title: name,
+          desc: role,
+          price: comm.toString(),
+          image: currentImage,
+          icon: 'fa-user-nurse',
+          badge: 'staff'
+        });
+      } catch(e) {
+        console.error(e);
+      }
+      
+      alert('Staff actualizado guardado correctamente.');
       calculateEarnings(); // Refresh table
     }
   }
 
-  function deleteStaff(id) {
+  async function deleteStaff(id) {
     if (!confirm('¿Seguro que deseas eliminar a esta manicurista de las opciones?')) return;
     let config = getStaffConfig();
+    
+    try {
+      const { data: existing } = await supabaseClient.from('rosegold_services').select('image').eq('id', id).limit(1);
+      if (existing && existing[0] && existing[0].image && existing[0].image.includes('supabase')) {
+        const oldFileName = existing[0].image.split('/').pop();
+        await supabaseClient.storage.from('rosegold_images').remove([oldFileName]);
+      }
+      await supabaseClient.from('rosegold_services').delete().eq('id', id);
+    } catch(e) {
+      console.error(e);
+    }
+    
     config = config.filter(s => s.id !== id);
     localStorage.setItem('nails_staff_config', JSON.stringify(config));
     calculateEarnings();
   }
 
-  function addNewStaffRow() {
+  async function addNewStaffRow() {
+    const newId = generateUUID();
+    const name = 'Nueva Manicurista';
+    const role = 'Especialidad';
+    const comm = 50;
+    
+    try {
+      await supabaseClient.from('rosegold_services').insert([{
+        id: newId,
+        title: name,
+        desc: role,
+        price: comm.toString(),
+        image: 'logo_veros.png',
+        icon: 'fa-user-nurse',
+        badge: 'staff'
+      }]);
+    } catch(e) {
+      console.error(e);
+    }
+    
     let config = getStaffConfig();
-    config.push({ id: Date.now().toString(), name: 'Nueva Manicurista', role: 'Especialidad', commission: 50 });
+    config.push({ id: newId, name: name, role: role, commission: comm });
     localStorage.setItem('nails_staff_config', JSON.stringify(config));
     calculateEarnings();
   }
@@ -984,6 +1066,5 @@
   };
   document.addEventListener('DOMContentLoaded', updateEditModeButton);
 </script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </body>
 </html>
